@@ -2,6 +2,7 @@
 
 Speech-to-text for any English sentence, running entirely on an **ESP32-S3** (240 MHz dual-core Xtensa LX7, 8 MB PSRAM,
 16 MB flash). No cloud, no command list, no neural accelerator. Built by [Lokutor](https://lokutor.com).
+Model on Hugging Face: [lokutor-ai/esp32-asr-conformer-ctc-small-int8](https://huggingface.co/lokutor-ai/esp32-asr-conformer-ctc-small-int8).
 
 > **Status (30 September 2026).** Every transcript below comes from the exact arithmetic of the on-chip engine: the host
 > build is bit-identical to the firmware, and firmware transcripts under Espressif's QEMU emulator match it word for word.
