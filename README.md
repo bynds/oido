@@ -1,8 +1,10 @@
-# esp32-asr: open-vocabulary speech recognition on a $5 microcontroller
+# Oído: speech recognition that fits in a $5 chip
+
+*¡Oído!* is what cooks call out in a Spanish kitchen to confirm an order: *heard, got it*.
 
 Speech-to-text for any English sentence, running entirely on an **ESP32-S3** (240 MHz dual-core Xtensa LX7, 8 MB PSRAM,
 16 MB flash). No cloud, no command list, no neural accelerator. Built by [Lokutor](https://lokutor.com).
-Model on Hugging Face: [lokutor-ai/esp32-asr-conformer-ctc-small-int8](https://huggingface.co/lokutor-ai/esp32-asr-conformer-ctc-small-int8).
+Model on Hugging Face: [lokutor-ai/oido-ctc-small-int8](https://huggingface.co/lokutor-ai/oido-ctc-small-int8).
 
 > **Status (30 September 2026).** Every transcript below comes from the exact arithmetic of the on-chip engine: the host
 > build is bit-identical to the firmware, and firmware transcripts under Espressif's QEMU emulator match it word for word.
@@ -15,8 +17,8 @@ Word error rate (%) on LibriSpeech, same text normalization for every system.
 
 | System | Runs on | test-clean | test-other | Size |
 |---|---|---|---|---|
-| **esp32-asr**: NVIDIA Conformer-CTC Small, int8, greedy (this repo) | ESP32-S3 | **3.7** | **8.2** | 14.0 MB |
-| esp32-asr with NVIDIA Conformer-Transducer Small, int8 (weights not included, see below) | ESP32-S3 | 3.0 | 6.7 | 15.5 MB |
+| **Oído**: NVIDIA Conformer-CTC Small, int8, greedy (this repo) | ESP32-S3 | **3.7** | **8.2** | 14.0 MB |
+| Oído with NVIDIA Conformer-Transducer Small, int8 (weights not included, see below) | ESP32-S3 | 3.0 | 6.7 | 15.5 MB |
 | Espressif MultiNet7 (ESP-SR benchmark; its API takes fixed command lists) | ESP32-S3 | 8.5 | 21.3 | 2.9 MB |
 | Moonshine tiny, fp32 | laptop | 5.0 | 12.1 | 27 M params |
 | Whisper tiny.en, fp32 | laptop | 6.3 | 15.9 | 39 M params |

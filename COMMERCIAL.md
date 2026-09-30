@@ -1,6 +1,6 @@
 # Commercial licensing
 
-esp32-asr is free software under the GNU GPL v3. You may use, modify and ship it under those terms. For consumer
+Oído is free software under the GNU GPL v3. You may use, modify and ship it under those terms. For consumer
 devices this includes providing the corresponding source code and the information needed to install modified firmware.
 
 If those terms don't fit your product, [Lokutor](https://lokutor.com) (Hashing Works, S.L.L., Madrid) offers:
