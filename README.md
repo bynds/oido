@@ -30,11 +30,11 @@ Word error rate (%) on LibriSpeech, same text normalization for every system.
 **Robustness** (300 LibriSpeech utterances under real DEMAND noise, babble and room reverb; `eval/make_robust.py`,
 full numbers in [`results/robustness.json`](results/robustness.json)):
 
-| Mean WER over 14 conditions | Transducer int8 (chip) | CTC int8 + LM (chip) | Whisper tiny.en | Moonshine tiny | Vosk small |
+| Mean WER over 14 conditions | This repo, CTC int8 (chip) | Transducer int8 (chip) | Whisper tiny.en | Moonshine tiny | Vosk small |
 |---|---|---|---|---|---|
-| | **6.7** | 7.6 | 12.1 | 12.2 | 21.7 |
+| | **8.4** | 6.7 | 12.1 | 12.2 | 21.7 |
 
-Car and kitchen noise at 5 dB SNR cost under 1 point, and living-room noise about 1.7. Four-talker babble at 5 dB and very
+For the transducer, car and kitchen noise at 5 dB SNR cost under 1 point, and living-room noise about 1.7. Four-talker babble at 5 dB and very
 reverberant rooms are the hard cases.
 
 ## Speed and memory

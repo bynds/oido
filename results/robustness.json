@@ -111,6 +111,22 @@
    "living_5db": 15.08,
    "reverb_0.4s": 15.33,
    "reverb_0.8s": 33.64
+  },
+  "nemo8_greedy": {
+   "babble_10db": 10.86,
+   "babble_5db": 27.62,
+   "cafe_10db": 5.32,
+   "cafe_5db": 9.54,
+   "car_10db": 3.59,
+   "car_5db": 3.59,
+   "clean": 3.47,
+   "farfield_kitchen": 13.46,
+   "kitchen_10db": 3.95,
+   "kitchen_5db": 4.7,
+   "living_10db": 4.4,
+   "living_5db": 5.65,
+   "reverb_0.4s": 5.8,
+   "reverb_0.8s": 16.03
   }
  },
  "n_utts": 300,
