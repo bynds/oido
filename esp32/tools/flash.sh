@@ -14,6 +14,7 @@ PY=${PYTHON:-$(command -v python3)}   # needs numpy + soundfile (ESP-IDF's own p
 cd "$(dirname "$0")/.."
 . "${IDF_PATH:-$HOME/esp/esp-idf}/export.sh" > /dev/null
 case "$MODEL" in
+  *nemo4*.tnm) LAYOUT=nemo4_16; CFG="sdkconfig.defaults;sdkconfig.nemo4" ;;    # int4: 6 MB left for your app
   *rnnt*.tnm) LAYOUT=rnnt16; CFG="sdkconfig.defaults;sdkconfig.rnnt16"; LM="" ;;   # transducer: no external LM
   *.tnm)      LAYOUT=nemo16lm; CFG="sdkconfig.defaults;sdkconfig.nemo16lm" ;;
   *)          LAYOUT=tinyasr16; CFG="sdkconfig.defaults" ;;

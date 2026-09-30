@@ -24,6 +24,8 @@ done
 LMF=$ROOT/models/nemo_lm.tlm
 case "$MODEL" in
   *rnnt*) unset TASR_LM; L=rnnt16; CFG=sdkconfig.rnnt16 ;;
+  *nemo4*) L=nemo4_16; CFG=sdkconfig.nemo4
+     if [ -z "$NO_LM" ] && [ -f "$LMF" ]; then export TASR_LM=$LMF; else unset TASR_LM; fi ;;
   *) if [ -z "$NO_LM" ] && [ -f "$LMF" ]; then export TASR_LM=$LMF; L=nemo16lm; CFG=sdkconfig.nemo16lm
      else unset TASR_LM; L=nemo16bench; CFG=sdkconfig.nemo16bench; fi ;;
 esac

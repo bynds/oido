@@ -4,7 +4,8 @@
 
 Speech-to-text for any English sentence, running entirely on an **ESP32-S3** (240 MHz dual-core Xtensa LX7, 8 MB PSRAM,
 16 MB flash). No cloud, no command list, no neural accelerator. Built by [Lokutor](https://lokutor.com).
-Model on Hugging Face: [lokutor-ai/oido-ctc-small-int8](https://huggingface.co/lokutor-ai/oido-ctc-small-int8).
+Models on Hugging Face: [int8](https://huggingface.co/lokutor-ai/oido-ctc-small-int8) ·
+[int4](https://huggingface.co/lokutor-ai/oido-ctc-small-int4).
 
 > **Status (30 September 2026).** Every transcript below comes from the exact arithmetic of the on-chip engine: the host
 > build is bit-identical to the firmware, and firmware transcripts under Espressif's QEMU emulator match it word for word.
@@ -18,6 +19,7 @@ Word error rate (%) on LibriSpeech, same text normalization for every system.
 | System | Runs on | test-clean | test-other | Size |
 |---|---|---|---|---|
 | **Oído**: NVIDIA Conformer-CTC Small, int8, greedy (this repo) | ESP32-S3 | **3.7** | **8.2** | 14.0 MB |
+| **Oído int4** (`models/nemo4.tnm`, 4-bit quantization-aware fine-tune), greedy | ESP32-S3 | 4.6 | 10.0 | **8.3 MB** |
 | Oído with NVIDIA Conformer-Transducer Small, int8 (weights not included, see below) | ESP32-S3 | 3.0 | 6.7 | 15.5 MB |
 | Espressif MultiNet7 (ESP-SR benchmark; its API takes fixed command lists) | ESP32-S3 | 8.5 | 21.3 | 2.9 MB |
 | Moonshine tiny, fp32 | laptop | 5.0 | 12.1 | 27 M params |
@@ -44,7 +46,7 @@ reverberant rooms are the hard cases.
 
 | | |
 |---|---|
-| Flash | 14.0 MB model (int8); partition layouts for 16 MB modules in `esp32/firmware/partitions_*.csv` |
+| Flash | 14.0 MB (int8), or **8.3 MB (int4), which leaves a 6 MB app partition for your own code** (`partitions_nemo4.csv`) |
 | PSRAM | 2.4 MB working memory peak for a 20 s utterance (measured in QEMU); the rest caches the most-reused weights |
 | Compute | ~225 M instructions per second of audio across both cores, ~121 M on the dual-core critical path (exact, QEMU `-icount`) |
 | Real-time factor | **estimated 0.7–0.95**: 1.3–1.6 cycles per instruction at 240 MHz, plus flash/PSRAM stalls. Not yet measured on silicon |
@@ -79,7 +81,8 @@ python live_demo.py                                   # microphone -> the firmwa
 and optionally a 0.96" SSD1306 OLED (SDA→GPIO8, SCL→GPIO9). Needs ESP-IDF v5.5.
 
 ```bash
-esp32/tools/flash.sh /dev/ttyUSB0 models/nemo8.tnm              # live microphone
+esp32/tools/flash.sh /dev/ttyUSB0 models/nemo8.tnm              # live microphone, most accurate
+esp32/tools/flash.sh /dev/ttyUSB0 models/nemo4.tnm              # int4: 8.3 MB, leaves 6 MB of flash for your app
 TASR_OLED=1 esp32/tools/flash.sh /dev/ttyUSB0 models/nemo8.tnm  # + transcript on the OLED
 TASR_MODE=file esp32/tools/flash.sh /dev/ttyUSB0 models/nemo8.tnm clip.wav "reference"   # prints measured RTF
 ```
@@ -109,7 +112,7 @@ esp32/tools/               flash.sh, emulate.sh, run_qemu.sh, bench_latency.py, 
 train/                     PyTorch port of NVIDIA's model (nemo_small.py, rnnt_small.py), exporters, GRU LM training
 eval/                      WER normalization, robustness benchmark builder, laptop baselines
 results/                   benchmark outputs behind the numbers above
-models/                    nemo8.tnm (int8 Conformer-CTC Small) and its tokenizer
+models/                    nemo8.tnm (int8, 14.0 MB), nemo4.tnm (int4, 8.3 MB) and the tokenizer
 ```
 
 ## Limitations
@@ -125,8 +128,8 @@ models/                    nemo8.tnm (int8 Conformer-CTC Small) and its tokenize
 - **Code** is licensed under the **GNU GPL v3** ([`LICENSE`](LICENSE)).
 - For products that cannot meet GPLv3 terms (for example, consumer devices that do not allow users to install modified
   firmware), Lokutor offers commercial licenses and support. See [`COMMERCIAL.md`](COMMERCIAL.md).
-- **Model weights** in `models/` are derived from NVIDIA's `stt_en_conformer_ctc_small` and remain under
-  **CC-BY-4.0**. See [`NOTICE`](NOTICE).
+- **Model weights** are derived from NVIDIA's `stt_en_conformer_ctc_small`: `nemo8.tnm` is under **CC-BY-4.0**,
+  and `nemo4.tnm` (fine-tuned on public corpora that include share-alike data) is under **CC-BY-SA-4.0**. See
+  [`NOTICE`](NOTICE).
 
-Lokutor also has Spanish and other-language models, an int4 profile with more compute headroom, and an on-device TTS for
-the same chip. Contact us for these.
+Lokutor also has Spanish and other-language models and an on-device TTS for the same chip. Contact us for these.
