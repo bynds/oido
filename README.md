@@ -2,6 +2,11 @@
 
 *¡Oído!* is what cooks call out in a Spanish kitchen to confirm an order: *heard, got it*.
 
+[![Oído demo: speech recognition on a $5 chip](docs/demo.gif)](https://huggingface.co/lokutor-ai/oido-ctc-small-int8/blob/main/demo.mp4)
+
+*Animated demo; [full video with sound](https://huggingface.co/lokutor-ai/oido-ctc-small-int8/blob/main/demo.mp4).
+The transcripts are Oído's chip-exact output, sped up. Footage from a physical board is coming.*
+
 Speech-to-text for any English sentence, running entirely on an **ESP32-S3** (240 MHz dual-core Xtensa LX7, 8 MB PSRAM,
 16 MB flash). No cloud, no command list, no neural accelerator. Built by [Lokutor](https://lokutor.com).
 Models on Hugging Face: [int8](https://huggingface.co/lokutor-ai/oido-ctc-small-int8) ·
