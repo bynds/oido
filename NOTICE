@@ -1,0 +1,20 @@
+esp32-asr
+Copyright (C) 2026 Hashing Works, S.L.L. (Lokutor)
+
+The source code in this repository is licensed under the GNU General Public License v3 (see LICENSE). Commercial
+licenses are available (see COMMERCIAL.md).
+
+Model weights
+-------------
+models/nemo8.tnm contains weights derived from NVIDIA's "stt_en_conformer_ctc_small" (NVIDIA NeMo), licensed under the
+Creative Commons Attribution 4.0 International License (CC-BY-4.0), https://creativecommons.org/licenses/by/4.0/.
+Changes: re-implemented in PyTorch (train/nemo_small.py), quantized to int8 and packed into the TNM1 format
+(train/export_nemo.py). models/nemo_small/tokenizer.model is the model's original SentencePiece tokenizer. The files
+in models/ remain available under CC-BY-4.0.
+
+NVIDIA's "stt_en_conformer_transducer_small" is supported by the engine but not included; it is distributed by NVIDIA
+on NGC under the NGC Terms of Use.
+
+Data used for evaluation (not redistributed)
+--------------------------------------------
+LibriSpeech (CC-BY-4.0), DEMAND noise corpus (CC-BY-4.0, used by eval/make_robust.py).
