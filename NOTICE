@@ -22,6 +22,10 @@ on public speech corpora and quantized to int4. Fine-tuning data:
 Because of the share-alike sources, nemo4.tnm is released under CC-BY-SA-4.0,
 https://creativecommons.org/licenses/by-sa/4.0/.
 
+models/nemo_lm.tlm is a GRU language model (1.3 M parameters) trained by Lokutor on the LibriSpeech language-modeling
+corpus (public domain text from 14,500 books, https://www.openslr.org/11/), over the vocabulary of NVIDIA's tokenizer. It
+is released under CC-BY-4.0.
+
 NVIDIA's "stt_en_conformer_transducer_small" is supported by the engine but not included; it is distributed by NVIDIA
 on NGC under the NGC Terms of Use.
 

@@ -73,7 +73,10 @@ def main():
     a = ap.parse_args()
     path = {"accurate": os.path.join(MODELS, "nemo8.tnm"), "fast": os.path.join(MODELS, "nemo4.tnm")}.get(a.model, a.model)
     int4 = os.path.getsize(path) < 10_000_000
-    lm = None if a.no_lm else pytasr.LM(os.path.join(MODELS, "nemo_lm.tlm"))
+    lm_path = os.path.join(MODELS, "nemo_lm.tlm")
+    if not a.no_lm and not os.path.exists(lm_path):
+        print(f"note: {lm_path} not found, decoding greedily without the language model", flush=True)
+    lm = pytasr.LM(lm_path) if not a.no_lm and os.path.exists(lm_path) else None
     eng = pytasr.Nemo(path, lm=lm, beam=4 if lm else 0, lm_weight=0.3, token_bonus=0.5)
     seg = Segmenter()
     if a.save:

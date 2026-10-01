@@ -1,12 +1,16 @@
 #!/bin/bash
 # Build + flash firmware, model and LM to an ESP32-S3 N16R8 (16 MB flash, 8 MB octal PSRAM).
 # usage: tools/flash.sh <port> <model.tnm|model.tasr> [lm.tlm] [clip.wav "reference" ...]
+#   CTC models use models/nemo_lm.tlm by default when it exists; NO_LM=1 flashes greedy decoding only
 #   TASR_MODE=mic  (default) live INMP441 microphone: speak, the transcript prints after each pause
 #   TASR_MODE=file transcribe the given clips from flash and print WER and the measured real-time factor
 #   TASR_OLED=1    also drive an SSD1306 128x64 I2C OLED (SDA GPIO8, SCL GPIO9) with the live transcript
 set -e
-PORT=$1; MODEL=$(cd "$(dirname "$2")" && pwd)/$(basename "$2"); LM=${3:-}; shift 2; [ $# -gt 0 ] && shift
-[ -n "$LM" ] && LM=$(cd "$(dirname "$LM")" && pwd)/$(basename "$LM")
+PORT=$1; MODEL=$(cd "$(dirname "$2")" && pwd)/$(basename "$2"); shift 2
+LM=""; if [[ "${1:-}" == *.tlm ]]; then LM=$(cd "$(dirname "$1")" && pwd)/$(basename "$1"); shift; fi
+DEFLM="$(cd "$(dirname "$0")/../.." && pwd)/models/nemo_lm.tlm"
+[ -z "$LM" ] && [ -z "$NO_LM" ] && [[ "$MODEL" == *.tnm ]] && [ -f "$DEFLM" ] && LM=$DEFLM
+[ -n "$NO_LM" ] && LM=""
 WAVS=(); REFS=()
 while [ $# -gt 1 ]; do WAVS+=("$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"); REFS+=("$2"); shift 2; done
 MODE=${TASR_MODE:-mic}
