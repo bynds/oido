@@ -14,10 +14,15 @@ for w in "$@"; do
   out=/tmp/emu_$(basename "$w" | tr -c 'A-Za-z0-9._\n' _).wav   # resample/convert to 16 kHz mono PCM16
   "$PY" -c "
 import sys, numpy as np, soundfile as sf
-x, sr = sf.read(sys.argv[1], dtype='float32', always_2d=True); x = x.mean(1)
-if sr != 16000:
-    import scipy.signal as ss; x = ss.resample_poly(x, 16000, sr)
-sf.write(sys.argv[2], (np.clip(x, -1, 1) * 32767).astype(np.int16), 16000, subtype='PCM_16')" "$f" "$out"
+i = sf.info(sys.argv[1])
+if i.samplerate == 16000 and i.channels == 1 and i.subtype == 'PCM_16':  # already the engine's format: copy exactly
+    x, _ = sf.read(sys.argv[1], dtype='int16')
+else:
+    x, sr = sf.read(sys.argv[1], dtype='float64', always_2d=True); x = x.mean(1)
+    if sr != 16000:
+        import scipy.signal as ss; x = ss.resample_poly(x, 16000, sr)
+    x = np.clip(np.round(x * 32768.0), -32768, 32767).astype(np.int16)
+sf.write(sys.argv[2], x, 16000, subtype='PCM_16')" "$f" "$out"
   ARGS+=("$out" "-")
 done
 # layout: transducer models need no LM; CTC models use the LM partition when models/nemo_lm.tlm exists
@@ -30,6 +35,7 @@ case "$MODEL" in
      else unset TASR_LM; L=nemo16bench; CFG=sdkconfig.nemo16bench; fi ;;
 esac
 B=firmware/build_$L
+[ -n "$REBUILD" ] && rm -rf "firmware/sdkconfig_$L" "$B"   # regenerate the config from the defaults too
 if [ ! -f $B/tinyasr_fw.bin ] || [ -n "$REBUILD" ]; then
   (. "${IDF_PATH:-$HOME/esp/esp-idf}/export.sh" > /dev/null 2>&1; cd firmware
    idf.py -B build_$L -D SDKCONFIG=sdkconfig_$L -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;$CFG" build > /dev/null)

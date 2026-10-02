@@ -1,0 +1,515 @@
+[
+ {
+  "group": "rooms",
+  "sent": "4970-29093-0007",
+  "cond": "clean",
+  "label": "Quiet room",
+  "desc": "the original recording",
+  "ref": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "dur": 6.995,
+  "hyp": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "mp3": "samples/rooms_00.mp3",
+  "instr": 1605999200,
+  "host_hyp": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "chip_match": true,
+  "wer": 0.0,
+  "t": [
+   5.344139283333334,
+   6.448263733333334
+  ]
+ },
+ {
+  "group": "rooms",
+  "sent": "4970-29093-0007",
+  "cond": "car_5db",
+  "label": "Car, 5 dB SNR",
+  "desc": "real car-interior noise (DEMAND)",
+  "ref": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "dur": 6.995,
+  "hyp": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "mp3": "samples/rooms_01.mp3",
+  "instr": 1603494700,
+  "host_hyp": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "chip_match": true,
+  "wer": 0.0,
+  "t": [
+   5.336677960416667,
+   6.439080566666667
+  ]
+ },
+ {
+  "group": "rooms",
+  "sent": "4970-29093-0007",
+  "cond": "kitchen_5db",
+  "label": "Kitchen, 5 dB SNR",
+  "desc": "real kitchen noise (DEMAND)",
+  "ref": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "dur": 6.995,
+  "hyp": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "mp3": "samples/rooms_02.mp3",
+  "instr": 1600924300,
+  "host_hyp": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "chip_match": true,
+  "wer": 0.0,
+  "t": [
+   5.329020310416667,
+   6.429655766666667
+  ]
+ },
+ {
+  "group": "rooms",
+  "sent": "4970-29093-0007",
+  "cond": "living_5db",
+  "label": "Living room, 5 dB SNR",
+  "desc": "real living-room noise (DEMAND)",
+  "ref": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "dur": 6.995,
+  "hyp": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "mp3": "samples/rooms_03.mp3",
+  "instr": 1607202350,
+  "host_hyp": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "chip_match": true,
+  "wer": 0.0,
+  "t": [
+   5.347723667708334,
+   6.452675283333334
+  ]
+ },
+ {
+  "group": "rooms",
+  "sent": "4970-29093-0007",
+  "cond": "cafe_5db",
+  "label": "Cafeteria, 5 dB SNR",
+  "desc": "real cafeteria noise with background talk (DEMAND)",
+  "ref": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "dur": 6.995,
+  "hyp": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "mp3": "samples/rooms_04.mp3",
+  "instr": 1606954550,
+  "host_hyp": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "chip_match": true,
+  "wer": 0.0,
+  "t": [
+   5.346985430208334,
+   6.451766683333334
+  ]
+ },
+ {
+  "group": "rooms",
+  "sent": "4970-29093-0007",
+  "cond": "babble_10db",
+  "label": "Babble, 10 dB SNR",
+  "desc": "four other talkers",
+  "ref": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "dur": 6.995,
+  "hyp": "it is such a noble ambition that it is a pity it has usually such a shallow foundation would",
+  "mp3": "samples/rooms_05.mp3",
+  "instr": 1612170850,
+  "host_hyp": "it is such a noble ambition that it is a pity it has usually such a shallow foundation would",
+  "chip_match": true,
+  "wer": 5.555555555555555,
+  "t": [
+   5.362525657291667,
+   6.470893116666668
+  ]
+ },
+ {
+  "group": "rooms",
+  "sent": "4970-29093-0007",
+  "cond": "babble_5db",
+  "label": "Babble, 5 dB SNR",
+  "desc": "four other talkers, louder (hardest case)",
+  "ref": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "dur": 6.995,
+  "hyp": "don't it is such a noble ambition between that it is a pity it has such a shallow proination of the italian",
+  "mp3": "samples/rooms_06.mp3",
+  "instr": 1625777650,
+  "host_hyp": "don't it is such a noble ambition between that it is a pity it has such a shallow doination of the italian",
+  "chip_match": false,
+  "wer": 38.88888888888889,
+  "t": [
+   5.403062582291668,
+   6.520784716666667
+  ]
+ },
+ {
+  "group": "rooms",
+  "sent": "4970-29093-0007",
+  "cond": "reverb_0.4s",
+  "label": "Reverberant room, RT60 0.4 s",
+  "desc": "5 x 4 x 3 m room, talker 2 m from the microphone",
+  "ref": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "dur": 6.995,
+  "hyp": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "mp3": "samples/rooms_07.mp3",
+  "instr": 1599663200,
+  "host_hyp": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "chip_match": true,
+  "wer": 0.0,
+  "t": [
+   5.325263283333334,
+   6.425031733333334
+  ]
+ },
+ {
+  "group": "rooms",
+  "sent": "4970-29093-0007",
+  "cond": "reverb_0.8s",
+  "label": "Very reverberant room, RT60 0.8 s",
+  "desc": "same room, harder walls",
+  "ref": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "dur": 6.995,
+  "hyp": "it is such an open ambition that it is a pity it has usually such a shallow foundation",
+  "mp3": "samples/rooms_08.mp3",
+  "instr": 1599278050,
+  "host_hyp": "it is such an open ambition that it is a pity it has usually such a shallow foundation",
+  "chip_match": true,
+  "wer": 11.11111111111111,
+  "t": [
+   5.324115857291667,
+   6.423619516666667
+  ]
+ },
+ {
+  "group": "rooms",
+  "sent": "4970-29093-0007",
+  "cond": "farfield_kitchen",
+  "label": "Far field + kitchen noise",
+  "desc": "0.6 s reverberation and kitchen noise at 10 dB",
+  "ref": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "dur": 6.995,
+  "hyp": "it is such a noble ambition that it is a pity it has usually such a shallow combination",
+  "mp3": "samples/rooms_09.mp3",
+  "instr": 1609507750,
+  "host_hyp": "it is such a noble ambition that it is a pity it has usually such a shallow foundation",
+  "chip_match": false,
+  "wer": 5.555555555555555,
+  "t": [
+   5.354591838541667,
+   6.461128416666667
+  ]
+ },
+ {
+  "group": "rooms",
+  "sent": "8230-279154-0016",
+  "cond": "clean",
+  "label": "Quiet room",
+  "desc": "the original recording",
+  "ref": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "dur": 10.6,
+  "hyp": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "mp3": "samples/rooms_10.mp3",
+  "instr": 2568703425,
+  "host_hyp": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "chip_match": true,
+  "wer": 0.0,
+  "t": [
+   8.5005956203125,
+   10.266579225000001
+  ]
+ },
+ {
+  "group": "rooms",
+  "sent": "8230-279154-0016",
+  "cond": "car_5db",
+  "label": "Car, 5 dB SNR",
+  "desc": "real car-interior noise (DEMAND)",
+  "ref": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "dur": 10.6,
+  "hyp": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "mp3": "samples/rooms_11.mp3",
+  "instr": 2575297050,
+  "host_hyp": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "chip_match": true,
+  "wer": 0.0,
+  "t": [
+   8.520239128125,
+   10.29075585
+  ]
+ },
+ {
+  "group": "rooms",
+  "sent": "8230-279154-0016",
+  "cond": "kitchen_5db",
+  "label": "Kitchen, 5 dB SNR",
+  "desc": "real kitchen noise (DEMAND)",
+  "ref": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "dur": 10.6,
+  "hyp": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "mp3": "samples/rooms_12.mp3",
+  "instr": 2570752525,
+  "host_hyp": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "chip_match": true,
+  "wer": 0.0,
+  "t": [
+   8.506700230729168,
+   10.274092591666667
+  ]
+ },
+ {
+  "group": "rooms",
+  "sent": "8230-279154-0016",
+  "cond": "living_5db",
+  "label": "Living room, 5 dB SNR",
+  "desc": "real living-room noise (DEMAND)",
+  "ref": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "dur": 10.6,
+  "hyp": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "mp3": "samples/rooms_13.mp3",
+  "instr": 2572095075,
+  "host_hyp": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "chip_match": true,
+  "wer": 0.0,
+  "t": [
+   8.5106999109375,
+   10.279015275
+  ]
+ },
+ {
+  "group": "rooms",
+  "sent": "8230-279154-0016",
+  "cond": "cafe_5db",
+  "label": "Cafeteria, 5 dB SNR",
+  "desc": "real cafeteria noise with background talk (DEMAND)",
+  "ref": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "dur": 10.6,
+  "hyp": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness and some against",
+  "mp3": "samples/rooms_14.mp3",
+  "instr": 2558389950,
+  "host_hyp": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness than some against",
+  "chip_match": false,
+  "wer": 12.5,
+  "t": [
+   8.469870059375001,
+   10.22876315
+  ]
+ },
+ {
+  "group": "rooms",
+  "sent": "8230-279154-0016",
+  "cond": "babble_10db",
+  "label": "Babble, 10 dB SNR",
+  "desc": "four other talkers",
+  "ref": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "dur": 10.6,
+  "hyp": "in actual fact there are doubtless various factors that concur in giving us feeling a greater or less remoteness and some member of",
+  "mp3": "samples/rooms_15.mp3",
+  "instr": 2570315350,
+  "host_hyp": "in actual fact there are doubtless various factors that concur in giving us feeling a greater or less remoteness and some member of",
+  "chip_match": true,
+  "wer": 20.833333333333336,
+  "t": [
+   8.505397813541666,
+   10.272489616666668
+  ]
+ },
+ {
+  "group": "rooms",
+  "sent": "8230-279154-0016",
+  "cond": "babble_5db",
+  "label": "Babble, 5 dB SNR",
+  "desc": "four other talkers, louder (hardest case)",
+  "ref": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "dur": 10.6,
+  "hyp": "in actual fact there are doubtless various factors that concur by giving a spar or greater or less remote and some",
+  "mp3": "samples/rooms_16.mp3",
+  "instr": 2566121700,
+  "host_hyp": "in actual fact there are doubtless various factors that concur by giving a spar or greater or less remote distance and some",
+  "chip_match": false,
+  "wer": 37.5,
+  "t": [
+   8.49290423125,
+   10.257112900000001
+  ]
+ },
+ {
+  "group": "rooms",
+  "sent": "8230-279154-0016",
+  "cond": "reverb_0.4s",
+  "label": "Reverberant room, RT60 0.4 s",
+  "desc": "5 x 4 x 3 m room, talker 2 m from the microphone",
+  "ref": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "dur": 10.6,
+  "hyp": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "mp3": "samples/rooms_17.mp3",
+  "instr": 2575386125,
+  "host_hyp": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "chip_match": true,
+  "wer": 0.0,
+  "t": [
+   8.520504497395834,
+   10.291082458333333
+  ]
+ },
+ {
+  "group": "rooms",
+  "sent": "8230-279154-0016",
+  "cond": "reverb_0.8s",
+  "label": "Very reverberant room, RT60 0.8 s",
+  "desc": "same room, harder walls",
+  "ref": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "dur": 10.6,
+  "hyp": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "mp3": "samples/rooms_18.mp3",
+  "instr": 2574440600,
+  "host_hyp": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "chip_match": true,
+  "wer": 0.0,
+  "t": [
+   8.517687620833334,
+   10.287615533333334
+  ]
+ },
+ {
+  "group": "rooms",
+  "sent": "8230-279154-0016",
+  "cond": "farfield_kitchen",
+  "label": "Far field + kitchen noise",
+  "desc": "0.6 s reverberation and kitchen noise at 10 dB",
+  "ref": "in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event",
+  "dur": 10.6,
+  "hyp": "in actual fact there are doubtless various factors that occur in giving us the feeling a greater or less remoteness and some remembered event",
+  "mp3": "samples/rooms_19.mp3",
+  "instr": 2575581375,
+  "host_hyp": "in actual fact there are doubtless various factors that occur in giving us the feeling a greater or less remoteness and some remembered event",
+  "chip_match": true,
+  "wer": 12.5,
+  "t": [
+   8.5210861796875,
+   10.291798375
+  ]
+ },
+ {
+  "group": "real",
+  "sent": "commonvoice17-en-f256ff2f4f2b2264",
+  "cond": "Common Voice",
+  "label": "Common Voice",
+  "desc": "volunteers' own microphones, at home",
+  "ref": "no such authority was given for the court of appeal whose registries remained closed",
+  "dur": 6.228,
+  "hyp": "no such authority was given for the course of peel whose registries remained closed",
+  "mp3": "samples/real_20.mp3",
+  "instr": 1424605725,
+  "host_hyp": "no such authority was given for the course of peel whose registries remained closed",
+  "chip_match": true,
+  "wer": 14.285714285714285,
+  "t": [
+   4.742377889062501,
+   5.721794325000001
+  ]
+ },
+ {
+  "group": "real",
+  "sent": "commonvoice17-en-d2df73087fd3f47f",
+  "cond": "Common Voice",
+  "label": "Common Voice",
+  "desc": "volunteers' own microphones, at home",
+  "ref": "the performance was recorded and later released on a live album titled late orchestration",
+  "dur": 7.668,
+  "hyp": "the performance was recorded and later released on a live album titled late orchestration",
+  "mp3": "samples/real_21.mp3",
+  "instr": 1776770050,
+  "host_hyp": "the performance was recorded and later released on a live album titled late orchestration",
+  "chip_match": true,
+  "wer": 0.0,
+  "t": [
+   5.906734107291667,
+   7.128263516666667
+  ]
+ },
+ {
+  "group": "real",
+  "sent": "commonvoice17-en-f239c51d69933adb",
+  "cond": "Common Voice",
+  "label": "Common Voice",
+  "desc": "volunteers' own microphones, at home",
+  "ref": "he has been locked up so long he has been mostly forgotten about",
+  "dur": 5.76,
+  "hyp": "he has been locked up so long he has been mostly forgotten about",
+  "mp3": "samples/real_22.mp3",
+  "instr": 1302498600,
+  "host_hyp": "he has been locked up so long he has been mostly forgotten about",
+  "chip_match": true,
+  "wer": 0.0,
+  "t": [
+   4.3411604125,
+   5.2366282
+  ]
+ },
+ {
+  "group": "real",
+  "sent": "20131121-0900-PLENARY-16-en_20131121-15:51:47_3",
+  "cond": "VoxPopuli",
+  "label": "VoxPopuli",
+  "desc": "European Parliament microphones",
+  "ref": "the qatari government and the football authorities must take notice",
+  "dur": 3.7599375,
+  "hyp": "the qari government and the football authorities must take notice",
+  "mp3": "samples/real_23.mp3",
+  "instr": 843912700,
+  "host_hyp": "the qatari government and the football authorities must take notice",
+  "chip_match": false,
+  "wer": 10.0,
+  "t": [
+   2.814951585416667,
+   3.395141566666667
+  ]
+ },
+ {
+  "group": "real",
+  "sent": "20130416-0900-PLENARY-11-en_20130416-17:53:39_12",
+  "cond": "VoxPopuli",
+  "label": "VoxPopuli",
+  "desc": "European Parliament microphones",
+  "ref": "the court still sees scope for further improving the quality of spending by simply applying the current system to its full potential",
+  "dur": 7.94,
+  "hyp": "the court still sees scope for further improving the quality of spending by simply applying the current system to its full potential",
+  "mp3": "samples/real_24.mp3",
+  "instr": 1883384250,
+  "host_hyp": "the court still sees scope for further improving the quality of spending by simply applying the current system to its full potential",
+  "chip_match": true,
+  "wer": 0.0,
+  "t": [
+   6.246115578125001,
+   7.540942250000001
+  ]
+ },
+ {
+  "group": "real",
+  "sent": "ami-ihm-db358b61066d4874",
+  "cond": "AMI meeting",
+  "label": "AMI meeting",
+  "desc": "spontaneous meeting speech, headset microphone",
+  "ref": "so that indicates that there's an menu under that menu",
+  "dur": 3.5700625,
+  "hyp": "so that indicates a menu under that menu",
+  "mp3": "samples/real_25.mp3",
+  "instr": 796670275,
+  "host_hyp": "so that indicates a menu under that menu",
+  "chip_match": true,
+  "wer": 30.0,
+  "t": [
+   2.659018527604167,
+   3.206729341666667
+  ]
+ },
+ {
+  "group": "real",
+  "sent": "ami-ihm-12928169fcc63243",
+  "cond": "AMI meeting",
+  "label": "AMI meeting",
+  "desc": "spontaneous meeting speech, headset microphone",
+  "ref": "yeah i think of it in terms of you know not even maybe to well",
+  "dur": 3.84,
+  "hyp": "yeah i think of it in terms of you know not even maybe to what",
+  "mp3": "samples/real_26.mp3",
+  "instr": 856137725,
+  "host_hyp": "yeah i think of it in terms of you know not even maybe to what",
+  "chip_match": true,
+  "wer": 6.666666666666667,
+  "t": [
+   2.857776972395834,
+   3.4463716583333337
+  ]
+ }
+]

@@ -1,0 +1,14 @@
+nemo4 babble_10db.jsonl: WER 12.06% (sub 514 del 128 ins 81) 300 utts 0.61h in 8s
+nemo4 babble_5db.jsonl: WER 31.82% (sub 1103 del 680 ins 125) 300 utts 0.61h in 8s
+nemo4 cafe_10db.jsonl: WER 5.79% (sub 280 del 44 ins 23) 300 utts 0.61h in 8s
+nemo4 cafe_5db.jsonl: WER 10.56% (sub 476 del 120 ins 37) 300 utts 0.61h in 8s
+nemo4 car_10db.jsonl: WER 3.75% (sub 183 del 23 ins 19) 300 utts 0.61h in 8s
+nemo4 car_5db.jsonl: WER 3.75% (sub 180 del 23 ins 22) 300 utts 0.61h in 8s
+nemo4 clean.jsonl: WER 3.72% (sub 182 del 21 ins 20) 300 utts 0.61h in 8s
+nemo4 farfield_kitchen.jsonl: WER 13.29% (sub 623 del 119 ins 55) 300 utts 0.61h in 8s
+nemo4 kitchen_10db.jsonl: WER 4.07% (sub 197 del 25 ins 22) 300 utts 0.61h in 8s
+nemo4 kitchen_5db.jsonl: WER 5.05% (sub 243 del 31 ins 29) 300 utts 0.61h in 8s
+nemo4 living_10db.jsonl: WER 4.57% (sub 224 del 28 ins 22) 300 utts 0.61h in 8s
+nemo4 living_5db.jsonl: WER 5.85% (sub 279 del 42 ins 30) 300 utts 0.61h in 8s
+nemo4 reverb_0.4s.jsonl: WER 6.00% (sub 294 del 45 ins 21) 300 utts 0.61h in 8s
+nemo4 reverb_0.8s.jsonl: WER 18.53% (sub 811 del 239 ins 61) 300 utts 0.61h in 8s

@@ -5,15 +5,21 @@
 [![Oído demo: speech recognition on a $5 chip](docs/demo.gif)](https://huggingface.co/lokutor-ai/oido-ctc-small-int8/blob/main/demo.mp4)
 
 *Animated demo; [full video with sound](https://huggingface.co/lokutor-ai/oido-ctc-small-int8/blob/main/demo.mp4).
-The transcripts are Oído's chip-exact output, sped up. Footage from a physical board is coming.*
+The transcripts are Oído's output, sped up. Footage from a physical board is coming.*
 
 Speech-to-text for any English sentence, running entirely on an **ESP32-S3** (240 MHz dual-core Xtensa LX7, 8 MB PSRAM,
 16 MB flash). No cloud, no command list, no neural accelerator. Built by [Lokutor](https://lokutor.com).
 Models on Hugging Face: [int8](https://huggingface.co/lokutor-ai/oido-ctc-small-int8) ·
 [int4](https://huggingface.co/lokutor-ai/oido-ctc-small-int4).
 
-> **Status (30 September 2026).** Every transcript below comes from the exact arithmetic of the on-chip engine: the host
-> build is bit-identical to the firmware, and firmware transcripts under Espressif's QEMU emulator match it word for word.
+**[Audio samples](https://lokutor-ai.github.io/oido/)**: random clips in a quiet room, a car, a kitchen, a cafeteria,
+reverberant rooms and real meetings, each with the reference, the on-chip transcript (errors marked) and the compute
+it took on the chip.
+
+> **Status (2 October 2026).** Accuracy numbers come from the host build of the engine, which compiles the same C code
+> as the firmware (same int8 arithmetic). Under Espressif's QEMU emulator the firmware gives identical transcripts on
+> most utterances; the laptop's math library and the chip's round the last bit differently, which can change a word on
+> some hard, noisy clips (22 of 27 random clips identical, see the [audio samples](https://lokutor-ai.github.io/oido/)).
 > Real-time speed is **estimated** from exact emulator instruction counts. Measurements on physical boards follow in the
 > next days and will be added here.
 
@@ -78,7 +84,7 @@ The engine (`esp32/components/tinyasr`) is new C written for the ESP32-S3's PIE 
 
 ## Try it
 
-**On a laptop, with the chip's exact arithmetic.** Needs Python with numpy, soundfile, sentencepiece and sounddevice.
+**On a laptop, with the same engine as the chip.** Needs Python with numpy, soundfile, sentencepiece and sounddevice.
 
 ```bash
 cd esp32/host && make

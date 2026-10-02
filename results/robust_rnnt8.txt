@@ -1,0 +1,14 @@
+rnnt8 babble_10db.jsonl: WER 8.36% (sub 378 del 82 ins 41) 300 utts 0.61h in 11s
+rnnt8 babble_5db.jsonl: WER 25.95% (sub 950 del 486 ins 120) 300 utts 0.61h in 10s
+rnnt8 cafe_10db.jsonl: WER 3.87% (sub 187 del 26 ins 19) 300 utts 0.61h in 10s
+rnnt8 cafe_5db.jsonl: WER 7.24% (sub 331 del 82 ins 21) 300 utts 0.61h in 10s
+rnnt8 car_10db.jsonl: WER 2.62% (sub 127 del 19 ins 11) 300 utts 0.61h in 10s
+rnnt8 car_5db.jsonl: WER 2.74% (sub 131 del 18 ins 15) 300 utts 0.61h in 11s
+rnnt8 clean.jsonl: WER 2.48% (sub 121 del 18 ins 10) 300 utts 0.61h in 11s
+rnnt8 farfield_kitchen.jsonl: WER 10.41% (sub 468 del 116 ins 40) 300 utts 0.61h in 10s
+rnnt8 kitchen_10db.jsonl: WER 3.05% (sub 144 del 21 ins 18) 300 utts 0.61h in 9s
+rnnt8 kitchen_5db.jsonl: WER 3.32% (sub 160 del 21 ins 18) 300 utts 0.61h in 9s
+rnnt8 living_10db.jsonl: WER 3.22% (sub 156 del 22 ins 15) 300 utts 0.61h in 9s
+rnnt8 living_5db.jsonl: WER 4.15% (sub 197 del 38 ins 14) 300 utts 0.61h in 8s
+rnnt8 reverb_0.4s.jsonl: WER 4.60% (sub 220 del 42 ins 14) 300 utts 0.61h in 8s
+rnnt8 reverb_0.8s.jsonl: WER 12.36% (sub 540 del 167 ins 34) 300 utts 0.61h in 8s

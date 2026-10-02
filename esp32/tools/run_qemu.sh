@@ -15,6 +15,6 @@ timeout 7200 "$QEMU" -nographic -machine esp32s3 -m 8M \
   -global driver=ssi_psram,property=is_octal,value=true -drive file="$OUT/flash.bin",if=mtd,format=raw \
   -icount shift=0 > "$OUT/qemu.txt" 2>&1 &
 QPID=$!
-until grep -qE "^DONE|abort|Guru" "$OUT/qemu.txt" 2>/dev/null; do sleep 3; done
+until grep -qE "^DONE|abort|Guru|load failed|no audio partition" "$OUT/qemu.txt" 2>/dev/null; do sleep 3; done
 kill $QPID 2>/dev/null || true
 grep -E "CALIB|tinyasr:|UTT|REF|HYP|TOTAL|MEM|PROF|abort|Guru" "$OUT/qemu.txt"

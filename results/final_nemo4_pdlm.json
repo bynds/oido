@@ -1,0 +1,14 @@
+{
+ "model": "nemo4.tnm",
+ "chunk": 32,
+ "left": 2,
+ "beam_lm": {
+  "test-clean": 3.7783231550710576,
+  "test-other": 8.433988227199755,
+  "val_cv.local.jsonl": 11.75113731018133,
+  "val_vox.local.jsonl": 11.129704255173827,
+  "val_ami.local.jsonl": 20.194605667463296,
+  "val_ps.local.jsonl": 10.690890481064484,
+  "val_e22.local.jsonl": 21.104518484710177
+ }
+}

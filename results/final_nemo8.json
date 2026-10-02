@@ -1,5 +1,5 @@
 {
- "model": "models/nemo8.tnm",
+ "model": "nemo8.tnm",
  "chunk": 32,
  "left": 2,
  "greedy": {

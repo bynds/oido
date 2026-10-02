@@ -1,0 +1,113 @@
+{
+ "model": "nemo4.tnm",
+ "n": 7,
+ "wer": 0.0,
+ "median_text_after_s": [
+  2.817535382291667,
+  3.2260743166666668
+ ],
+ "max_text_after_s": [
+  3.5329959250000007,
+  4.090579600000001
+ ],
+ "rows": [
+  {
+   "audio_s": 2.23,
+   "instr_M": 438.20025,
+   "compute_s": [
+    1.483871578125,
+    1.78513425
+   ],
+   "text_after_s": [
+    2.283871578125,
+    2.5851342500000003
+   ],
+   "ref": "he tried to think how it could be",
+   "hyp": "he tried to think how it could be"
+  },
+  {
+   "audio_s": 3.44,
+   "instr_M": 692.76705,
+   "compute_s": [
+    2.3390685031250005,
+    2.8153458500000004
+   ],
+   "text_after_s": [
+    3.1390685031250003,
+    3.6153458500000006
+   ],
+   "ref": "he had the faith in him that moves mountains",
+   "hyp": "he had the faith in him that moves mountains"
+  },
+  {
+   "audio_s": 3.09,
+   "instr_M": 594.23845,
+   "compute_s": [
+    2.017535382291667,
+    2.4260743166666665
+   ],
+   "text_after_s": [
+    2.817535382291667,
+    3.2260743166666668
+   ],
+   "ref": "again again",
+   "hyp": "again again"
+  },
+  {
+   "audio_s": 2.4,
+   "instr_M": 472.99135,
+   "compute_s": [
+    1.601120063541667,
+    1.9263016166666669
+   ],
+   "text_after_s": [
+    2.4011200635416667,
+    2.726301616666667
+   ],
+   "ref": "then he comes to the beak of it",
+   "hyp": "then he comes to the beak of it"
+  },
+  {
+   "audio_s": 3.02,
+   "instr_M": 596.184875,
+   "compute_s": [
+    2.0177341067708334,
+    2.4276112083333334
+   ],
+   "text_after_s": [
+    2.8177341067708337,
+    3.2276112083333333
+   ],
+   "ref": "it must remember be one or the other",
+   "hyp": "it must remember be one or the other"
+  },
+  {
+   "audio_s": 3.96,
+   "instr_M": 811.0308,
+   "compute_s": [
+    2.732995925000001,
+    3.2905796000000005
+   ],
+   "text_after_s": [
+    3.5329959250000007,
+    4.090579600000001
+   ],
+   "ref": "ojo examined this curious contrivance with wonder",
+   "hyp": "ojo examined this curious contrivance with wonder"
+  },
+  {
+   "audio_s": 2.7,
+   "instr_M": 543.194,
+   "compute_s": [
+    1.8342654583333333,
+    2.2077113333333336
+   ],
+   "text_after_s": [
+    2.634265458333333,
+    3.007711333333334
+   ],
+   "ref": "asked the voice in scornful accents",
+   "hyp": "asked the voice in scornful accents"
+  }
+ ]
+}
