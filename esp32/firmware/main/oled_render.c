@@ -14,9 +14,27 @@ static void put_line(uint8_t *fb, int row, const char *s, int n, int invert)
     memset(p, invert ? 0xff : 0x00, OLED_W);
     for (int i = 0; i < n && i < COLS; i++) {
         unsigned char ch = (unsigned char)s[i];
-        const uint8_t *g = (ch >= 32 && ch < 127) ? font5x7[ch - 32] : font5x7[0];
+        const uint8_t *g = (ch >= 32 && ch < 32 + sizeof(font5x7) / 5) ? font5x7[ch - 32] : font5x7[0];
         for (int c = 0; c < 5; c++) p[1 + i * 6 + c] = invert ? (uint8_t)~g[c] : g[c];
     }
+}
+
+// UTF-8 -> one byte per glyph: á é í ó ú ü ñ (and their capitals) become font codes 127..133, other non-ASCII '?'
+static void to_glyphs(const char *in, char *out, int max)
+{
+    static const unsigned char lo[7] = {0xa1, 0xa9, 0xad, 0xb3, 0xba, 0xbc, 0xb1};  // second byte after 0xc3
+    int n = 0;
+    for (const unsigned char *p = (const unsigned char *)in; *p && n < max - 1; p++) {
+        if (*p < 0x80) { out[n++] = (char)*p; continue; }
+        char g = '?';
+        if (*p == 0xc3 && p[1]) {
+            const unsigned char b = p[1] | 0x20;  // capitals (0x81, 0x89, ...) -> lowercase codes
+            for (int i = 0; i < 7; i++) if (b == lo[i]) g = (char)(127 + i);
+        }
+        out[n++] = g;
+        while ((p[1] & 0xc0) == 0x80) p++;  // skip continuation bytes
+    }
+    out[n] = 0;
 }
 
 // greedy word wrap of one utterance into lines of <= COLS chars; returns number of lines written (<= max)
@@ -58,8 +76,10 @@ void oled_render(uint8_t *fb, const char *status, const char *hist)
         char buf[512];
         int l = e ? (int)(e - u) : (int)strlen(u);
         if (l > (int)sizeof(buf) - 1) l = sizeof(buf) - 1;
-        memcpy(buf, u, l);
-        buf[l] = 0;
+        char raw[512];
+        memcpy(raw, u, l);
+        raw[l] = 0;
+        to_glyphs(raw, buf, sizeof(buf));
         n += wrap(buf, all + n, 64 - n);
         u = e ? e + 1 : NULL;
     }

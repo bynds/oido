@@ -73,7 +73,7 @@ int tasr_seg_feed(tasr_seg_t *s, const int16_t *in, int k)
     const int take = k < room ? k : room;
     memcpy(s->buf + s->n, blk, sizeof(int16_t) * take);
     s->n += take;
-    if (s->silence > TASR_SEG_HANG_BLOCKS || s->n >= s->cap) {
+    if (s->silence > (s->hang > 0 ? s->hang : TASR_SEG_HANG_BLOCKS) || s->n >= s->cap) {
         if (s->voiced >= TASR_SEG_MIN_VOICED) return s->n;
         s->speech = s->silence = s->voiced = 0;  // too short to be speech: back to idle, keep the tail as pre-roll
         if (s->n > TASR_SEG_PREROLL) {

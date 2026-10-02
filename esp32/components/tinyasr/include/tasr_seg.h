@@ -17,6 +17,7 @@ typedef struct {
     float gain, noise_floor;
     int16_t *buf;  // utterance buffer (caller-owned)
     int cap, n, speech, silence, voiced, init;
+    int hang;  // non-speech blocks that end an utterance (0 = TASR_SEG_HANG_BLOCKS); e.g. 25 = 0.5 s for voice agents
 } tasr_seg_t;
 
 void tasr_seg_init(tasr_seg_t *s, int16_t *buf, int cap);

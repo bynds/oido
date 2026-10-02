@@ -8,6 +8,9 @@ typedef struct tasr_decoder tasr_decoder_t;
 
 tasr_lm_t *tasr_lm_load(const uint8_t *blob, size_t size);
 void tasr_lm_free(tasr_lm_t *lm);
+// beam-search weights recommended by the LM file (tuned on its own language); fallback if the file has none
+float tasr_lm_weight(const tasr_lm_t *lm, float fallback);
+float tasr_lm_bonus(const tasr_lm_t *lm, float fallback);
 // copy LM weight matrices into tasr_alloc(kind 0) memory (PSRAM on ESP32); returns bytes moved
 size_t tasr_lm_to_ram(tasr_lm_t *lm);
 // lm may be NULL (plain CTC prefix beam search)

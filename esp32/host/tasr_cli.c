@@ -92,7 +92,7 @@ int main(int argc, char **argv)
     if (nemo) {  // defaults tuned on dev-clean: beam 4, LM weight 0.3, token bonus 0.5
         nm = tasr_nemo_load(mb, msz);
         if (!nm) { fprintf(stderr, "cannot load NeMo model %s\n", argv[1]); return 1; }
-        if (lm) dec = tasr_decoder_create(lm, 1025, beam, 6, lw < 0 ? 0.3f : lw, tb < 0 ? 0.5f : tb);
+        if (lm) dec = tasr_decoder_create(lm, 1025, beam, 6, lw < 0 ? tasr_lm_weight(lm, 0.3f) : lw, tb < 0 ? tasr_lm_bonus(lm, 0.5f) : tb);
     } else {
         tasr_model_t *m = tasr_model_load(mb, msz);
         if (!m) { fprintf(stderr, "cannot load model %s\n", argv[1]); return 1; }

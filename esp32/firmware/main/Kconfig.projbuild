@@ -16,6 +16,13 @@ menu "tinyasr"
     config TASR_I2S_DIN
         int "I2S data-in (SD) GPIO"
         default 6
+    config TASR_SEG_HANG_MS
+        int "Pause (ms) that ends an utterance in microphone mode"
+        default 800
+        help
+            Silence after speech before the utterance is closed and its final text printed. With a streaming
+            model almost all compute is done by then, so this pause is most of the latency; voice agents
+            typically use 400-600 ms (or their own turn detector).
     config TASR_OLED
         bool "SSD1306 128x64 I2C OLED showing the live transcript"
         default n

@@ -27,6 +27,7 @@ sf.write(sys.argv[2], x, 16000, subtype='PCM_16')" "$f" "$out"
 done
 # layout: transducer models need no LM; CTC models use the LM partition when models/nemo_lm.tlm exists
 LMF=$ROOT/models/nemo_lm.tlm
+[ -f "${MODEL%.tnm}.tlm" ] && LMF="${MODEL%.tnm}.tlm"   # a model's own LM (oido_es.tlm), else the English one
 case "$MODEL" in
   *rnnt*) unset TASR_LM; L=rnnt16; CFG=sdkconfig.rnnt16 ;;
   *nemo4*) L=nemo4_16; CFG=sdkconfig.nemo4

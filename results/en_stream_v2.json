@@ -1,0 +1,12 @@
+{"model": "oido-stream v2 (NVIDIA conformer-ctc-small fine-tuned for streaming with MUSAN noise/music/babble + simulated reverb augmentation; int8; chunk 32 frames, left context 128)",
+ "librispeech_wer": {
+  "full_context_greedy": {"test-clean": 4.07, "test-other": 8.97},
+  "full_context_pd_lm": {"test-clean": 3.43, "test-other": 7.78},
+  "stream32_greedy": {"test-clean": 6.27, "test-other": 13.06},
+  "stream32_pd_lm": {"test-clean": 4.86, "test-other": 11.03},
+  "stream16_pd_lm": {"test-clean": 6.14, "test-other": 13.23}},
+ "robustness_mean_14_conditions_pd_lm": {"v1_full": 8.93, "v1_stream32": 11.98, "v2_full": 6.22, "v2_stream32": 8.96, "released_nemo8_pd_lm": 7.45, "whisper_tiny_en": 12.11, "moonshine_tiny": 12.19},
+ "robustness_v2_stream32_pd_lm": {"babble_10db": 9.6, "babble_5db": 23.0, "cafe_10db": 6.8, "cafe_5db": 10.7, "car_10db": 4.6, "car_5db": 4.7, "clean": 4.8, "farfield_kitchen": 14.6, "kitchen_10db": 5.3, "kitchen_5db": 6.0, "living_10db": 5.2, "living_5db": 6.7, "reverb_0.4s": 7.2, "reverb_0.8s": 16.0},
+ "robustness_v2_full_pd_lm": {"babble_10db": 6.9, "babble_5db": 16.5, "cafe_10db": 4.8, "cafe_5db": 7.8, "car_10db": 3.1, "car_5db": 3.2, "clean": 3.1, "farfield_kitchen": 9.3, "kitchen_10db": 3.7, "kitchen_5db": 4.3, "living_10db": 3.9, "living_5db": 4.7, "reverb_0.4s": 4.7, "reverb_0.8s": 11.2},
+ "emulator_note": "firmware stream transcripts identical to the host build on 4/4 test clips; finish instructions ~16.6M + 5.5M per remaining encoder frame (both cores); estimates only until measured on a board",
+ "date": "2026-10-02"}

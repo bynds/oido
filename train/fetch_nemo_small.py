@@ -2,6 +2,7 @@
 
 python fetch_nemo_small.py ../models/nemo_small                     # Conformer-CTC Small (Hugging Face, CC-BY-4.0)
 python fetch_nemo_small.py ../models/nemo_rnnt --transducer        # Conformer-Transducer Small (NGC, NGC terms of use)
+python fetch_nemo_small.py <dir> --url <.nemo url>                 # any other NeMo Conformer-CTC
 Writes state_dict_plain.pt (plain tensor dict of model_weights.ckpt), tokenizer.model and model_config.yaml.
 """
 import io, os, sys, tarfile, urllib.request
@@ -35,6 +36,9 @@ def main(out, url=URL):
 
 if __name__ == "__main__":
     args = [x for x in sys.argv[1:] if not x.startswith("--")]
+    if "--url" in sys.argv:  # any other .nemo, e.g. the Spanish teacher used to filter training data:
+        # python fetch_nemo_small.py ../models/es_large --url https://huggingface.co/nvidia/stt_es_conformer_ctc_large/resolve/main/stt_es_conformer_ctc_large.nemo
+        main(args[0], sys.argv[sys.argv.index("--url") + 1]); sys.exit(0)
     rnnt = "--transducer" in sys.argv
     default = os.path.join(os.path.dirname(__file__), "..", "models", "nemo_rnnt" if rnnt else "nemo_small")
     main(args[0] if args else default, URL_RNNT if rnnt else URL)

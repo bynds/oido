@@ -33,6 +33,7 @@ Word error rate (%) on LibriSpeech, same text normalization for every system.
 | **Oído int4** (`models/nemo4.tnm`, 4-bit quantization-aware fine-tune), greedy | ESP32-S3 | 4.6 | 10.0 | **8.3 MB** |
 | **Oído int8 + language model** (`models/nemo_lm.tlm`, beam search on chip) | ESP32-S3 | 3.3 | 7.2 | 15.3 MB |
 | **Oído int4 + language model** | ESP32-S3 | 3.8 | 8.4 | 9.6 MB |
+| **Oído streaming** (`models/oido_stream.tnm`) + language model, 32-frame chunks (see [below](#low-latency-streaming-mode)) | ESP32-S3 | 4.9 | 11.0 | 15.3 MB |
 | Oído with NVIDIA Conformer-Transducer Small, int8 (weights not included, see below) | ESP32-S3 | 3.0 | 6.7 | 15.5 MB |
 | Espressif MultiNet7 (ESP-SR benchmark; its API takes fixed command lists) | ESP32-S3 | 8.5 | 21.3 | 2.7 MB |
 | Moonshine tiny, fp32 | laptop | 5.0 | 12.1 | 27 M params |
@@ -65,7 +66,34 @@ reverberant rooms are the hard cases.
 | PSRAM | 2.4 MB working memory peak for a 20 s utterance (measured in QEMU); the rest caches the most-reused weights |
 | Compute | ~225 M instructions per second of audio across both cores, ~121 M on the dual-core critical path (exact, QEMU `-icount`) |
 | Real-time factor | **estimated 0.7–0.95**: 1.3–1.6 cycles per instruction at 240 MHz, plus flash/PSRAM stalls. Not yet measured on silicon |
-| Latency | Utterance mode. Text appears after a 0.8 s pause plus compute: about 3 s for a 2–4 s command |
+| Latency | Utterance mode. Text appears after a 0.8 s pause plus compute: about 3 s for a 2–4 s command. [Streaming mode](#low-latency-streaming-mode) cuts this to about 1.1–1.4 s |
+
+## Low-latency streaming mode
+
+For voice-to-voice and other interactive uses, the time between the end of a sentence and its final text matters more
+than the last tenth of a percent of accuracy. `models/oido_stream.tnm` is the same Conformer, fine-tuned to run on
+audio **as it arrives**: the encoder processes 1.28 s chunks (32 frames) with 5 s of left context while you speak, so
+when you stop only the last partial chunk is left to compute. Partial text appears while you talk.
+
+| Mode (all on the ESP32-S3 engine, with the language model) | LibriSpeech clean / other | Mean WER, 14 noise and reverb conditions | Final text after you stop (estimated) |
+|---|---|---|---|
+| Utterance mode, released `nemo8.tnm` | 3.3 / 7.2 | 7.5 | ~3.0–3.4 s for a 2–4 s command |
+| **Streaming, 32-frame chunks** | 4.9 / 11.0 | 9.0 | **~1.1–1.4 s** |
+| Streaming, 16-frame chunks (0.64 s) | 6.1 / 13.2 | n/a | ~1.1–1.3 s, but see the speed note |
+| Same `oido_stream.tnm`, full-context mode | 3.4 / 7.8 | 6.2 | as utterance mode |
+
+- The final text arrives 0.8 s (the end-of-speech pause, `CONFIG_TASR_SEG_HANG_MS`, or `live_demo.py --pause`) plus
+  0.25–0.6 s of compute for the last chunk and a pass over the weights. Voice agents with their own turn detector can
+  use a shorter pause.
+- It was trained with the original model's weights as a starting point and noise, music, babble and reverberation
+  augmentation (MUSAN, simulated rooms), so it is as robust as the utterance model. The accuracy cost is the chunking:
+  the encoder cannot see what comes after the chunk.
+- **Speed is the open question.** Instruction counts are exact, but this chip is limited by how fast weights can be read
+  from flash and PSRAM, and a chunk re-reads them every chunk (4× as often at 16 frames as the 64-frame blocks of
+  utterance mode). Estimated real-time factor while speaking: **0.80–1.00 at 32 frames**, 0.96–1.24 at 16 frames (which
+  may fall behind). All of this is estimated, not measured on silicon; board numbers will replace it.
+- The transcripts of the firmware under QEMU match the laptop build on the clips we compared (see
+  [`results/en_stream_v2.json`](results/en_stream_v2.json)).
 
 ## How it works
 
@@ -91,6 +119,7 @@ cd esp32/host && make
 ./tasr_cli ../../models/nemo8.tnm recording.wav      # 16 kHz mono PCM16 wav
 python live_demo.py                                   # microphone -> the firmware's VAD + engine, with ESP32 time estimates
 python live_demo.py --model fast --no_lm              # int4, greedy decoding
+python live_demo.py --model stream                    # low latency: words appear while you speak (--pause 0.5 for a shorter pause)
 ```
 
 **On a board.** ESP32-S3-DevKitC-1 **N16R8**, an INMP441 I2S microphone (SCK→GPIO4, WS→GPIO5, SD→GPIO6, L/R→GND),
@@ -126,17 +155,19 @@ esp32/components/tinyasr/  on-chip engine: tasr_nemo.c (Conformer CTC/RNN-T), ke
 esp32/firmware/            ESP-IDF app: live I2S microphone or benchmark mode, OLED, partition layouts
 esp32/host/                host build of the engine: tasr_cli, live_demo.py, seg_test, eval_engine.py, benchmark.py
 esp32/tools/               flash.sh, emulate.sh, run_qemu.sh, bench_latency.py, mkimages.py
-train/                     PyTorch port of NVIDIA's model (nemo_small.py, rnnt_small.py), exporters, GRU LM training
+train/                     PyTorch port of NVIDIA's model (nemo_small.py, rnnt_small.py), exporters, GRU LM training,
+                           int4 QAT (train_nemo_qat.py), streaming + new-language fine-tuning (train_nemo_stream.py,
+                           augment.py, filter_teacher.py, make_tok.py, prep_es.py)
 eval/                      WER normalization, robustness benchmark builder, laptop baselines
 results/                   benchmark outputs behind the numbers above
-models/                    nemo8.tnm (int8, 14.0 MB), nemo4.tnm (int4, 8.3 MB), nemo_lm.tlm (language model, 1.3 MB),
-                           and the tokenizer
+models/                    nemo8.tnm (int8, 14.0 MB), nemo4.tnm (int4, 8.3 MB), oido_stream.tnm (streaming int8, 14.0 MB),
+                           nemo_lm.tlm (language model, 1.3 MB), and the tokenizer
 ```
 
 ## Limitations
 
 - English only.
-- Text appears after each utterance, not word by word.
+- Utterance mode prints text after each utterance; streaming mode shows partial text but is less accurate (see above).
 - Very noisy crowds and reverberant rooms remain hard.
 - Speed is estimated until board measurements are published.
 - Requires an ESP32-S3 with 16 MB flash and 8 MB octal PSRAM (N16R8).
@@ -147,7 +178,7 @@ models/                    nemo8.tnm (int8, 14.0 MB), nemo4.tnm (int4, 8.3 MB), 
 - For products that cannot meet GPLv3 terms (for example, consumer devices that do not allow users to install modified
   firmware), Lokutor offers commercial licenses and support. See [`COMMERCIAL.md`](COMMERCIAL.md).
 - **Model weights** are derived from NVIDIA's `stt_en_conformer_ctc_small`: `nemo8.tnm` is under **CC-BY-4.0**,
-  and `nemo4.tnm` (fine-tuned on public corpora that include share-alike data) is under **CC-BY-SA-4.0**. The language
-  model `nemo_lm.tlm` is under **CC-BY-4.0**. See [`NOTICE`](NOTICE).
+  while `nemo4.tnm` and `oido_stream.tnm` (fine-tuned on public corpora that include share-alike data) are under
+  **CC-BY-SA-4.0**. The language model `nemo_lm.tlm` is under **CC-BY-4.0**. See [`NOTICE`](NOTICE).
 
 Lokutor also has Spanish and other-language models and an on-device TTS for the same chip. Contact us for these.

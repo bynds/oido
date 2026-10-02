@@ -19,7 +19,10 @@ def qlin(buf, w, b):
 
 st = torch.load(sys.argv[1], map_location="cpu")
 sd, cfg = st["model"], st["cfg"]
-buf = bytearray(b"TLM1" + struct.pack("<7I", cfg["vocab"], cfg["emb"], cfg["hid"], 0, 0, 0, 0))
+# optional: python export_lm.py lm.pt out.tlm [lm_weight token_bonus]  (recommended beam-search weights, stored in the header)
+w100 = int(round(float(sys.argv[3]) * 100)) if len(sys.argv) > 3 else 0
+b100 = int(round(float(sys.argv[4]) * 100)) if len(sys.argv) > 4 else 0
+buf = bytearray(b"TLM1" + struct.pack("<7I", cfg["vocab"], cfg["emb"], cfg["hid"], w100, b100, 0, 0))
 qlin(buf, sd["emb.weight"], None)
 qlin(buf, sd["gru.weight_ih_l0"], sd["gru.bias_ih_l0"])
 qlin(buf, sd["gru.weight_hh_l0"], sd["gru.bias_hh_l0"])

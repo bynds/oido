@@ -1,6 +1,10 @@
 """Export the NeMo conformer-ctc-small port to the TNM1 blob for the C engine (tasr_nemo.c).
 
-python export_nemo.py ../models/nemo_small out.tnm [--bits 8]
+python export_nemo.py ../models/nemo_small out.tnm [bits] [checkpoint] [tokenizer.model]
+
+Header word 10 holds flags: bit 0 = fixed feature normalization (80 means + 80 stds appended after the tokens),
+bit 1 = trained for streaming (chunked attention, chunk-limited depthwise conv); words 11/12 = default streaming
+chunk and left context in encoder frames.
 """
 import os, struct, sys
 import numpy as np, torch, sentencepiece as spm
@@ -8,7 +12,7 @@ from export import W
 from nemo_small import NemoSmall
 
 
-def export(d, out, bits=8, ckpt=None):
+def export(d, out, bits=8, ckpt=None, tokenizer=None, chunk=32, left=128):
     # CTC model: state_dict_plain.pt (fetch_nemo_small.py); transducer: model_weights.ckpt unpacked from the .nemo
     path = f"{d}/state_dict_plain.pt" if os.path.exists(f"{d}/state_dict_plain.pt") else f"{d}/model_weights.ckpt"
     sd = dict(torch.load(path, map_location="cpu"))
@@ -17,15 +21,22 @@ def export(d, out, bits=8, ckpt=None):
         sd["decoder.decoder_layers.0.weight"] = torch.zeros(1025, 176, 1)
         sd["decoder.decoder_layers.0.bias"] = torch.zeros(1025)
     m = NemoSmall(sd).eval()
-    if ckpt:  # QAT fine-tuned weights (NemoSmall state dict)
+    st = {}
+    if ckpt:  # fine-tuned weights (NemoSmall state dict; train_nemo_qat.py or train_nemo_stream.py)
         st = torch.load(ckpt, map_location="cpu")
         m.load_state_dict(st["model"])
-        print("loaded QAT weights from", ckpt, "step", st.get("step"))
-    tok = "tokenizer.model" if os.path.exists(f"{d}/tokenizer.model") else [f for f in os.listdir(d) if f.endswith("tokenizer.model")][0]
-    sp = spm.SentencePieceProcessor(model_file=f"{d}/{tok}")
+        print("loaded fine-tuned weights from", ckpt, "step", st.get("step"))
+    assert not st.get("causal"), "causal-conv checkpoints are not supported by the engine"
+    fixed = st.get("norm_mean") is not None
+    flags = (1 if fixed else 0) | (2 if st.get("stream") else 0)
+    if tokenizer is None:
+        tok = "tokenizer.model" if os.path.exists(f"{d}/tokenizer.model") else [f for f in os.listdir(d) if f.endswith("tokenizer.model")][0]
+        tokenizer = f"{d}/{tok}"
+    sp = spm.SentencePieceProcessor(model_file=tokenizer)
     V = sp.get_piece_size()
     w = W()
-    w.buf += b"TNM1" + struct.pack("<15I", 1, 176, 4, 704, 31, 16, 176, V, bits, int(rnnt), 0, 0, 0, 0, 0)
+    w.buf += b"TNM1" + struct.pack("<15I", 1, 176, 4, 704, 31, 16, 176, V, bits, int(rnnt), flags,
+                                   chunk if flags & 2 else 0, left if flags & 2 else 0, 0, 0)
     w.f32(m.pre.window)
     w.f32(m.pre.fb.t().contiguous().reshape(-1))            # (257, 80) row-major, like TASR
     w.f32(m.conv0.weight.reshape(-1)); w.f32(m.conv0.bias)
@@ -65,9 +76,13 @@ def export(d, out, bits=8, ckpt=None):
         if sp.is_unknown(i) or sp.is_control(i):
             b = b""
         w.buf += bytes([len(b)]) + b
+    if fixed:
+        w.f32(st["norm_mean"].float()); w.f32(st["norm_std"].float())
     open(out, "wb").write(w.buf)
-    print(f"wrote {out}: {len(w.buf)/1e6:.3f} MB (bits={bits}, vocab={V})")
+    print(f"wrote {out}: {len(w.buf)/1e6:.3f} MB (bits={bits}, vocab={V}, flags={flags})")
 
 
 if __name__ == "__main__":
-    export(sys.argv[1], sys.argv[2], int(sys.argv[3]) if len(sys.argv) > 3 else 8, sys.argv[4] if len(sys.argv) > 4 else None)
+    a = sys.argv[1:]
+    export(a[0], a[1], int(a[2]) if len(a) > 2 else 8, a[3] if len(a) > 3 and a[3] != "-" else None,
+           a[4] if len(a) > 4 else None)

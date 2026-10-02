@@ -83,14 +83,23 @@ class Layer(nn.Module):
 
 
 class NemoSmall(nn.Module):
+    """Any NeMo Conformer-CTC with striding subsampling; sizes are read from the state dict (small: d=176, 16 layers,
+    4 heads, FF 704; large: d=512, 18 layers, 8 heads, FF 2048)."""
     def __init__(self, sd):
         super().__init__()
+        C = sd["encoder.pre_encode.conv.0.weight"].shape[0]
+        d, sub_in = sd["encoder.pre_encode.out.weight"].shape
+        n = 1 + max(int(k.split(".")[2]) for k in sd if k.startswith("encoder.layers."))
+        h = sd["encoder.layers.0.self_attn.pos_bias_u"].shape[0]
+        ff = sd["encoder.layers.0.feed_forward1.linear1.weight"].shape[0]
+        k = sd["encoder.layers.0.conv.depthwise_conv.weight"].shape[-1]
+        self.d, self.vocab = d, sd["decoder.decoder_layers.0.weight"].shape[0] - 1  # blank = last index
         self.pre = NemoPre(sd["preprocessor.featurizer.window"], sd["preprocessor.featurizer.fb"])
-        self.conv0 = nn.Conv2d(1, 176, 3, stride=2, padding=1)
-        self.conv2 = nn.Conv2d(176, 176, 3, stride=2, padding=1)
-        self.sub_out = nn.Linear(3520, 176)
-        self.layers = nn.ModuleList([Layer() for _ in range(16)])
-        self.head = nn.Linear(176, 1025)
+        self.conv0 = nn.Conv2d(1, C, 3, stride=2, padding=1)
+        self.conv2 = nn.Conv2d(C, C, 3, stride=2, padding=1)
+        self.sub_out = nn.Linear(sub_in, d)
+        self.layers = nn.ModuleList([Layer(d, h, ff, k) for _ in range(n)])
+        self.head = nn.Linear(d, self.vocab + 1)
         self.load_nemo(sd)
 
     @torch.no_grad()
@@ -123,8 +132,8 @@ class NemoSmall(nn.Module):
         x = F.relu(self.conv0(feats[None, None]))
         x = F.relu(self.conv2(x))                       # (1, 176, T', 20)
         x = self.sub_out(x[0].permute(1, 0, 2).reshape(x.shape[2], -1))
-        x = x * math.sqrt(176.0)
-        pe = rel_pos_emb(x.shape[0], 176)
+        x = x * math.sqrt(float(self.d))
+        pe = rel_pos_emb(x.shape[0], self.d)
         for L in self.layers:
             x = L(x, pe)
         return x
@@ -133,7 +142,7 @@ class NemoSmall(nn.Module):
         f = self.pre(wav)
         n = wav.shape[0] // 160          # valid frames; the encoder sees all T = n+1 frames (last is zero)
         e = self.encode(f)
-        return self.head(e), f, e        # logits (T', 1025), blank = 1024
+        return self.head(e), f, e        # logits (T', vocab + 1), blank = vocab
 
 
 if __name__ == "__main__":

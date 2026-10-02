@@ -93,8 +93,8 @@ static void run_nemo(const uint8_t *blob, uint32_t blob_size)
         tasr_lm_t *lm = tasr_lm_load(lmp + 16, lbytes);
         if (lm) {
             size_t mv = tasr_lm_to_ram(lm);
-            dec = tasr_decoder_create(lm, 1025, CONFIG_TASR_BEAM, 6, CONFIG_TASR_LM_WEIGHT_X100 / 100.0f,
-                                      CONFIG_TASR_TOKEN_BONUS_X100 / 100.0f);
+            dec = tasr_decoder_create(lm, 1025, CONFIG_TASR_BEAM, 6, tasr_lm_weight(lm, CONFIG_TASR_LM_WEIGHT_X100 / 100.0f),
+                                      tasr_lm_bonus(lm, CONFIG_TASR_TOKEN_BONUS_X100 / 100.0f));
             ESP_LOGI(TAG, "LM %u bytes in PSRAM, beam %d", (unsigned)mv, CONFIG_TASR_BEAM);
         }
     }
@@ -104,7 +104,9 @@ static void run_nemo(const uint8_t *blob, uint32_t blob_size)
 #else
     const size_t reserve = 2700000;  // per-utterance buffers for clips up to 20 s (1.9 MB measured at 15 s)
 #endif
-    size_t budget = free_ps > reserve ? free_ps - reserve : 0;
+    const int streaming = tasr_nemo_stream_supported(m);
+    // a streaming model also keeps its attention / conv caches and positional rows (~2 MB at chunk 16, left 128)
+    size_t budget = free_ps > reserve + (streaming ? 2200000 : 0) ? free_ps - reserve - (streaming ? 2200000 : 0) : 0;
     size_t moved = tasr_nemo_place_weights(m, budget);
     ESP_LOGI(TAG, "NeMo conformer-ctc-small: %u weight bytes, %u moved to PSRAM | free PSRAM %u internal %u",
              (unsigned)tasr_nemo_weight_bytes(m), (unsigned)moved, (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
@@ -119,8 +121,10 @@ static void run_nemo(const uint8_t *blob, uint32_t blob_size)
     uint32_t n_utt;
     memcpy(&n_utt, aud + 4, 4);
     const uint8_t *p = aud + 8;
-    double tot_audio = 0, tot_cycles = 0;
+    double tot_audio = 0, tot_cycles = 0, tot_fin = 0;
     static char text[4096];
+    tasr_nemo_stream_t *st = streaming ? tasr_nemo_stream_new(m, 0, 0, dec) : NULL;
+    if (streaming) printf("STREAM model: chunk/left defaults, stream %s\n", st ? "ok" : "ALLOCATION FAILED");
     for (uint32_t u = 0; u < n_utt; u++) {
         uint32_t ns, tl;
         memcpy(&ns, p, 4); memcpy(&tl, p + 4, 4);
@@ -135,7 +139,19 @@ static void run_nemo(const uint8_t *blob, uint32_t blob_size)
         tot_cycles += cyc;
         printf("UTT %u | audio %.2fs | cycles %u | RTF %.3f\nREF: %.*s\nHYP: %s\n", (unsigned)u, sec, (unsigned)cyc,
                cyc / CPU_HZ / sec, (int)tl, ref, text);
+        if (st) {  // the same audio arriving in 20 ms blocks; what matters is the compute left after the last block
+            tasr_nemo_stream_reset(st);
+            uint32_t s0 = esp_cpu_get_cycle_count();
+            for (uint32_t o = 0; o < ns; o += 320) tasr_nemo_stream_feed(st, pcm + o, ns - o < 320 ? ns - o : 320);
+            uint32_t s1 = esp_cpu_get_cycle_count();
+            tasr_nemo_stream_finish(st, text, sizeof(text));
+            uint32_t s2 = esp_cpu_get_cycle_count();
+            tot_fin += s2 - s1;
+            printf("STREAM %u | feed cycles %u | finish cycles %u (%.0f ms @240MHz) | RTF %.3f\nSHYP: %s\n", (unsigned)u,
+                   (unsigned)(s1 - s0), (unsigned)(s2 - s1), (s2 - s1) / CPU_HZ * 1000.0, (s2 - s0) / CPU_HZ / sec, text);
+        }
     }
+    if (st) printf("STREAM mean finish %.0f ms @240MHz\n", tot_fin / n_utt / CPU_HZ * 1000.0);
     printf("TOTAL audio %.1fs cycles %.0f RTF@240MHz %.3f\n", tot_audio, tot_cycles, tot_cycles / CPU_HZ / tot_audio);
     printf("MEM min free PSRAM %u internal %u\n", (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM),
            (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));

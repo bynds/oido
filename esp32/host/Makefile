@@ -12,3 +12,6 @@ tasr_cli: tasr_cli.c $(SRC) $(HDR)
 
 seg_test: seg_test.c $(SRC) $(HDR)
 	$(CC) $(CFLAGS) -o $@ seg_test.c $(SRC) -lm
+
+oled_preview: oled_preview.c ../firmware/main/oled_render.c ../firmware/main/oled.h ../firmware/main/font5x7.h
+	$(CC) -O2 -std=c11 -I../firmware/main oled_preview.c ../firmware/main/oled_render.c -o $@

@@ -13,6 +13,7 @@ struct tasr_lm {
     tasr_qlin_t emb;       // "linear" with n=V rows of E: row i = embedding of token i (scale per row)
     tasr_qlin_t w_ih, w_hh, out;
     int kp_max;
+    float dflt_weight, dflt_bonus;  // recommended beam-search weights stored in the header (0 = not set)
 };
 
 typedef struct {
@@ -49,6 +50,7 @@ tasr_lm_t *tasr_lm_load(const uint8_t *blob, size_t size)
     memcpy(hd, blob + 4, sizeof(hd));
     tasr_lm_t *lm = (tasr_lm_t *)tasr_alloc(sizeof(tasr_lm_t), 1);
     lm->V = hd[0]; lm->E = hd[1]; lm->H = hd[2];
+    lm->dflt_weight = hd[3] / 100.0f; lm->dflt_bonus = hd[4] / 100.0f;
     lcur_t c = {blob + 32, blob + size, 0};
     int kpm = 0;
     lm->emb = lqlin(&c, lm->V, lm->E, &kpm);
@@ -60,6 +62,8 @@ tasr_lm_t *tasr_lm_load(const uint8_t *blob, size_t size)
     return lm;
 }
 void tasr_lm_free(tasr_lm_t *lm) { tasr_free(lm); }
+float tasr_lm_weight(const tasr_lm_t *lm, float fallback) { return lm && lm->dflt_weight > 0.f ? lm->dflt_weight : fallback; }
+float tasr_lm_bonus(const tasr_lm_t *lm, float fallback) { return lm && lm->dflt_bonus > 0.f ? lm->dflt_bonus : fallback; }
 
 static size_t lm_move(tasr_qlin_t *L)
 {

@@ -61,6 +61,8 @@ struct tasr_nemo {
     nlayer_t *L;
     const char **tok;
     uint8_t *tok_len;
+    int flags, s_chunk, s_left;  // header words 10-12: bit 0 fixed normalization, bit 1 trained for streaming
+    const float *nmean, *nstd;   // fixed per-mel normalization (flags & 1)
     float tw_re[256], tw_im[256];
     int16_t bitrev[256];
     size_t weight_bytes, blob_bytes;
@@ -114,6 +116,7 @@ tasr_nemo_t *tasr_nemo_load(const uint8_t *blob, size_t size)
     tasr_nemo_t *m = (tasr_nemo_t *)tasr_alloc(sizeof(tasr_nemo_t), 1);
     m->d = hd[1]; m->h = hd[2]; m->ff = hd[3]; m->k = hd[4]; m->nl = hd[5]; m->sc = hd[6]; m->V = hd[7];
     const int bits = hd[8];
+    m->flags = hd[10]; m->s_chunk = hd[11]; m->s_left = hd[12];
     m->dh = m->d / m->h;
     m->dhp = (m->dh + 15) & ~15;
     m->f1 = (NMEL + 2 - 3) / 2 + 1;
@@ -185,6 +188,10 @@ tasr_nemo_t *tasr_nemo_load(const uint8_t *blob, size_t size)
         m->tok[i] = (const char *)c.p;
         c.p += m->tok_len[i];
     }
+    if (m->flags & 1) {  // fixed normalization stats appended after the tokens
+        m->nmean = nf32(&c, NMEL, NULL);
+        m->nstd = nf32(&c, NMEL, NULL);
+    }
     if (c.err || c.p > c.end) { tasr_nemo_free(m); return NULL; }
     m->blob_bytes = (size_t)(c.p - blob);
     m->weight_bytes = acc;
@@ -238,6 +245,18 @@ size_t tasr_nemo_place_weights(tasr_nemo_t *m, size_t budget)
     }
     return moved;
 }
+
+#ifdef TASR_DEBUG_SUMS  // bit-exact comparison of intermediate activations between the host build and the firmware
+#include <stdio.h>
+static void ndbg(const char *what, int i, const float *x, size_t n)
+{
+    uint32_t h = 2166136261u;
+    for (size_t k = 0; k < n; k++) { uint32_t b; memcpy(&b, &x[k], 4); h = (h ^ b) * 16777619u; }
+    printf("DBG %s %d %08x\n", what, i, (unsigned)h);
+}
+#else
+#define ndbg(what, i, x, n)
+#endif
 
 // ------------------------------------------------------------------ helpers
 static float nsig_tab[385], nsig_slope[384];
@@ -522,7 +541,16 @@ static float *nemo_features(const tasr_nemo_t *m, const int16_t *pcm, int n, int
     float *F = (float *)tasr_alloc(sizeof(float) * (size_t)T * NMEL, 0);
     nfeat_t fj = {m, pcm, n, F};
     tasr_parallel(nfeat_job, &fj, T);
+    ndbg("twre", 0, m->tw_re, 256);
+    ndbg("twim", 0, m->tw_im, 256);
+    ndbg("logmel", 0, F, (size_t)T * NMEL);
     for (int j = 0; j < NMEL; j++) {
+        if (m->nmean) {  // streaming-trained models: global per-mel statistics
+            const float mu = m->nmean[j], inv = 1.0f / m->nstd[j];
+            for (int t = 0; t < nvalid; t++) F[(size_t)t * NMEL + j] = (F[(size_t)t * NMEL + j] - mu) * inv;
+            F[(size_t)nvalid * NMEL + j] = 0.f;
+            continue;
+        }
         double mean = 0, var = 0;
         for (int t = 0; t < nvalid; t++) mean += F[(size_t)t * NMEL + j];
         mean /= nvalid;
@@ -758,6 +786,7 @@ int tasr_nemo_transcribe(const tasr_nemo_t *m, const int16_t *pcm, int n, tasr_d
     NB(tf);
     float *F = nemo_features(m, pcm, n, &T0);
     NE(tf, N_FEAT);
+    ndbg("feat", 0, F, (size_t)T0 * NMEL);
     const int T1 = (T0 - 1) / 2 + 1, T = (T1 - 1) / 2 + 1;
     nctx_t C;
     memset(&C, 0, sizeof(C));
@@ -865,6 +894,7 @@ int tasr_nemo_transcribe(const tasr_nemo_t *m, const int16_t *pcm, int n, tasr_d
     tasr_free(xq_sub);
     const float xscale = sqrtf((float)d);
     for (int i = 0; i < T * d; i++) x[i] *= xscale;
+    ndbg("sub", 0, x, (size_t)T * d);
     // ---- relative positional encodings (int8, shared by all layers before linear_pos)
     const int NP = 2 * T - 1;
     C.Tp = (T + 15) & ~15;
@@ -890,6 +920,7 @@ int tasr_nemo_transcribe(const tasr_nemo_t *m, const int16_t *pcm, int n, tasr_d
     const int kpp = m->L[0].pos.kp;
     int8_t *peq = (int8_t *)tasr_alloc((size_t)NP * kpp, 0);
     float *pes = (float *)tasr_alloc(sizeof(float) * NP, 0);
+    ndbg("pe", 0, pe, (size_t)NP * d);
     tasr_quant_rows(pe, NP, d, d, peq, kpp, kpp, pes);
     tasr_free(pe);
     NE(tpe, N_POS);
@@ -1027,6 +1058,7 @@ int tasr_nemo_transcribe(const tasr_nemo_t *m, const int16_t *pcm, int n, tasr_d
                 layernorm_row(r, d, L->n_out, r);
             }
         }
+        ndbg("layer", li, x, (size_t)T * d);
     }
     NB(thd);
     if (m->rnnt) {
@@ -1098,3 +1130,597 @@ int tasr_nemo_transcribe(const tasr_nemo_t *m, const int16_t *pcm, int n, tasr_d
     }
     return T;
 }
+
+// ================================================================== streaming
+// For models trained with train_nemo_stream.py --stream. Audio is fed as it arrives; every C encoder frames (40 ms
+// each) run through all layers with exactly the training masks:
+//   - attention over the frames of the current chunk and of the previous nl chunks (int8 keys/values cached per layer),
+//   - depthwise conv over cached past frames and the current chunk, zeros after the chunk's end,
+//   - fixed (global) feature normalization.
+// The transcript therefore does not depend on how the audio is split into feeds, and when the speaker stops only the
+// last partial chunk is left to compute. Positional projections depend only on relative offsets, which are bounded,
+// so they are computed once per stream object; caches have a fixed size whatever the utterance length.
+#define SRING 4096  // sample ring (feeds are consumed in slices of SSLICE samples)
+#define SSLICE 1600
+#define SMEL 16     // mel row ring
+
+struct tasr_nemo_stream {
+    const tasr_nemo_t *m;
+    int C, nl, Lc, Lcp, OMAX, NP, halo;
+    int8_t *p8;   // [layers][H][NP][dhp] positional rows, row r <-> relative offset OMAX - r
+    float *sp;    // [layers][H][NP]
+    int8_t *k8;   // [layers][H][Lc][dhp]
+    float *sk;    // [layers][H][Lc]
+    int8_t *vt;   // [layers][H][dh][Lcp]
+    float *sv;    // [layers][H][Lc]
+    float *gh;    // [layers][halo + C + halo][d] conv inputs: past rows, chunk rows, zeros
+    int kbase, nk;
+    // front end
+    int16_t ring[SRING];
+    long n_samp;
+    int mel_t, T0, T1, T, c0_next, t2_next, finished;
+    float *mel;    // [SMEL][NMEL]
+    float *c0ring, *cmaxr, *cmw;
+    int8_t *col;
+    float *c2out, *fr, *xs_sub;
+    int8_t *xq_sub;
+    int nbat, nflat, t_chunk;
+    float *x;      // [C][d]
+    // work
+    nctx_t W;
+    float *hb, *h2, *att, *prow, *squ, *sqv;
+    int8_t *qu, *qv;
+    float *scb[NW];
+    int8_t *pq[NW];
+    int32_t *ia[NW];
+    int ia_n;
+    // decoding
+    tasr_decoder_t *dec;
+    float *lg, *lp;
+    int prev, len, frames;
+    float *sink;
+    int sink_max;
+    char text[2048];
+};
+
+static inline size_t sidx(const struct tasr_nemo_stream *s, int li, int hh) { return (size_t)li * s->m->h + hh; }
+
+// ---- mel frames: same arithmetic as nfeat_job; samples outside [0, nlim) are zero
+typedef struct {
+    struct tasr_nemo_stream *s;
+    int t0;
+    long nlim;
+} smel_t;
+static void smel_job(void *p, int b, int e, int w)
+{
+    (void)w;
+    smel_t *j = (smel_t *)p;
+    struct tasr_nemo_stream *s = j->s;
+    const tasr_nemo_t *m = s->m;
+    float xw[512], re[256], im[256], pw[NBIN];
+    for (int k = b; k < e; k++) {
+        const int t = j->t0 + k;
+        for (int i = 0; i < WIN; i++) {
+            const long si = (long)HOP * t - 200 + i;
+            float v = 0.f;
+            if (si >= 0 && si < j->nlim) {
+                const float x0 = s->ring[si & (SRING - 1)] / 32768.0f;
+                v = si == 0 ? x0 : x0 - 0.97f * (s->ring[(si - 1) & (SRING - 1)] / 32768.0f);
+            }
+            xw[i] = v * m->window[i];
+        }
+        for (int i = WIN; i < 512; i++) xw[i] = 0.f;
+        power_spectrum512(m, xw, re, im, pw);
+        float *o = s->mel + (size_t)(t % SMEL) * NMEL;
+        const float *wm = m->mel_w;
+        for (int q = 0; q < NMEL; q++) {
+            float acc = 0.f;
+            const float *pp = pw + m->mel_start[q];
+            for (int r = 0; r < m->mel_len[q]; r++) acc += pp[r] * wm[r];
+            wm += m->mel_len[q];
+            o[q] = (logf(acc + 5.9604644775390625e-08f) - m->nmean[q]) * (1.0f / m->nstd[q]);
+        }
+    }
+}
+
+// ---- attention for the n rows of a chunk (job over heads)
+typedef struct {
+    struct tasr_nemo_stream *s;
+    int li, n;
+} satt_t;
+static void satt_job(void *p, int b, int e, int w)
+{
+    satt_t *j = (satt_t *)p;
+    struct tasr_nemo_stream *s = j->s;
+    const tasr_nemo_t *m = s->m;
+    const int dh = m->dh, dhp = m->dhp, d = m->d, C = s->C, nkeys = s->nk;  // keys incl. this chunk
+    const float scale = 1.0f / sqrtf((float)dh);
+    const int kp16 = (nkeys + 15) & ~15;
+    float *sc = s->scb[w];
+    int8_t *pq = s->pq[w];
+    int32_t *ia = s->ia[w], *ib = ia + s->ia_n;
+    for (int hh = b; hh < e; hh++) {
+        const size_t g = sidx(s, j->li, hh);
+        const int8_t *K = s->k8 + g * s->Lc * dhp, *VT = s->vt + g * dh * s->Lcp, *P = s->p8 + g * s->NP * dhp;
+        const float *sk = s->sk + g * s->Lc, *sv = s->sv + g * s->Lc, *spp = s->sp + g * s->NP;
+        for (int r = 0; r < j->n; r++) {
+            const int i = s->t_chunk + r;
+            const int m0 = s->OMAX - i + s->kbase;  // positional row of key 0 (offset i - kbase)
+            const int8_t *qu = s->qu + ((size_t)hh * C + r) * dhp, *qv = s->qv + ((size_t)hh * C + r) * dhp;
+            if (dhp == 48) {
+                tasr_dot48_rows(qu, K, 48, nkeys, ia);
+                tasr_dot48_rows(qv, P + (size_t)m0 * 48, 48, nkeys, ib);
+            } else {
+                tasr_dot_rows_s8(qu, K, dhp, nkeys, dhp, ia);
+                tasr_dot_rows_s8(qv, P + (size_t)m0 * dhp, dhp, nkeys, dhp, ib);
+            }
+            const float A = s->squ[hh * C + r] * scale, B = s->sqv[hh * C + r] * scale;
+            const float *spm = spp + m0;
+            float mx = -1e30f;
+            for (int k = 0; k < nkeys; k++) {
+                const float a = (float)ia[k] * A * sk[k] + (float)ib[k] * B * spm[k];
+                sc[k] = a;
+                mx = a > mx ? a : mx;
+            }
+            float sum = 0.f, pm = 0.f;
+            const float mx64 = mx * NEXP_STEPS + 0.5f;
+            for (int k = 0; k < nkeys; k++) {
+                const int ix = (int)(mx64 - sc[k] * NEXP_STEPS);
+                const float ex = ix < NEXP_N ? nexp_tab[ix] : 0.f;
+                sum += ex;
+                const float p2 = ex * sv[k];
+                sc[k] = p2;
+                pm = p2 > pm ? p2 : pm;
+            }
+            if (pm < 1e-30f) pm = 1e-30f;
+            const float inv = 127.0f / pm;
+            for (int k = 0; k < nkeys; k++) { float y = sc[k] * inv + 12582912.0f; pq[k] = (int8_t)(int)(y - 12582912.0f); }
+            for (int k = nkeys; k < kp16; k++) pq[k] = 0;
+            tasr_dot_rows_s8(pq, VT, s->Lcp, dh, kp16, ia);
+            const float os = pm / 127.0f / sum;
+            float *y = s->att + (size_t)r * d + hh * dh;
+            for (int e2 = 0; e2 < dh; e2++) y[e2] = (float)ia[e2] * os;
+        }
+    }
+}
+
+static void s_qlin_rows(struct tasr_nemo_stream *s, const tasr_qlin_t *L, const float *x, int n, int K, float *y, int ldy)
+{
+    nquant(&s->W, x, n, K, K, L->kp);
+    nqlin(&s->W, L, n, y, ldy);
+}
+
+static void s_emit(struct tasr_nemo_stream *s, const float *l)
+{
+    const tasr_nemo_t *m = s->m;
+    const int V1 = m->V + 1;
+    if (s->sink && s->frames < s->sink_max) memcpy(s->sink + (size_t)s->frames * V1, l, sizeof(float) * V1);
+    int best = 0;
+    float bv = l[0];
+    for (int v = 1; v < V1; v++) if (l[v] > bv) { bv = l[v]; best = v; }
+    if (s->dec) {
+        float z = 0.f;
+        for (int v = 0; v < V1; v++) z += expf(l[v] - bv);
+        const float lz = bv + logf(z);
+        s->lp[0] = l[m->V] - lz;
+        for (int v = 0; v < m->V; v++) s->lp[v + 1] = l[v] - lz;
+        tasr_decoder_step(s->dec, s->lp);
+    } else if (best != s->prev && best != m->V) {
+        const int nl = m->tok_len[best];
+        if (s->len + nl + 1 < (int)sizeof(s->text)) { memcpy(s->text + s->len, m->tok[best], nl); s->len += nl; s->text[s->len] = 0; }
+    }
+    s->prev = best;
+    s->frames++;
+}
+
+// ---- one chunk of n <= C encoder rows (s->x, absolute index s->t_chunk) through all layers + CTC head
+static void s_encode_chunk(struct tasr_nemo_stream *s, int n)
+{
+    const tasr_nemo_t *m = s->m;
+    const int d = m->d, H = m->h, dh = m->dh, dhp = m->dhp, C = s->C, halo = s->halo;
+    // slide the caches: keep the previous nl chunks
+    const int base = s->t_chunk / C > s->nl ? (s->t_chunk / C - s->nl) * C : 0;
+    const int sh = base - s->kbase;
+    if (sh > 0) {
+        const int keep = s->nk - sh;
+        for (int li = 0; li < m->nl; li++)
+            for (int hh = 0; hh < H; hh++) {
+                const size_t g = sidx(s, li, hh);
+                memmove(s->k8 + g * s->Lc * dhp, s->k8 + (g * s->Lc + sh) * dhp, (size_t)keep * dhp);
+                memmove(s->sk + g * s->Lc, s->sk + g * s->Lc + sh, sizeof(float) * keep);
+                memmove(s->sv + g * s->Lc, s->sv + g * s->Lc + sh, sizeof(float) * keep);
+                for (int e2 = 0; e2 < dh; e2++) {
+                    int8_t *row = s->vt + (g * dh + e2) * s->Lcp;
+                    memmove(row, row + sh, keep);
+                }
+            }
+        s->kbase = base;
+        s->nk = keep;
+    }
+    const int k0 = s->nk;  // cache row of this chunk's first frame
+    float *x = s->x;
+    int8_t vtmp[64];
+    for (int li = 0; li < m->nl; li++) {
+        const nlayer_t *L = &m->L[li];
+        // FF1
+        nln_rows(x, n, d, L->n_ff1, s->hb);
+        s_qlin_rows(s, &L->ff1_1, s->hb, n, d, s->h2, m->ff);
+        nsilu(s->h2, n * m->ff);
+        s_qlin_rows(s, &L->ff1_2, s->h2, n, m->ff, s->hb, d);
+        for (int i = 0; i < n * d; i++) x[i] += 0.5f * s->hb[i];
+        // MHSA: q (+u/+v) for the chunk, k/v appended to the cache
+        nln_rows(x, n, d, L->n_att, s->hb);
+        s_qlin_rows(s, &L->qkv, s->hb, n, d, s->h2, 3 * d);
+        NB(tq8);
+        for (int t = 0; t < n; t++) {
+            const float *q = s->h2 + (size_t)t * 3 * d, *k = q + d, *v = q + 2 * d;
+            float tmp[64];
+            for (int hh = 0; hh < H; hh++) {
+                const size_t g = sidx(s, li, hh);
+                for (int e2 = 0; e2 < dh; e2++) tmp[e2] = q[hh * dh + e2] + L->pbu[hh * dh + e2];
+                s->squ[hh * C + t] = qvec(tmp, dh, s->qu + ((size_t)hh * C + t) * dhp, dhp);
+                for (int e2 = 0; e2 < dh; e2++) tmp[e2] = q[hh * dh + e2] + L->pbv[hh * dh + e2];
+                s->sqv[hh * C + t] = qvec(tmp, dh, s->qv + ((size_t)hh * C + t) * dhp, dhp);
+                s->sk[g * s->Lc + k0 + t] = qvec(k + hh * dh, dh, s->k8 + (g * s->Lc + k0 + t) * dhp, dhp);
+                s->sv[g * s->Lc + k0 + t] = qvec(v + hh * dh, dh, vtmp, dh);
+                for (int e2 = 0; e2 < dh; e2++) s->vt[(g * dh + e2) * s->Lcp + k0 + t] = vtmp[e2];
+            }
+        }
+        NE(tq8, N_QKV8);
+        {
+            const int nk_save = s->nk;
+            s->nk = k0 + n;
+            NB(ta);
+            satt_t aj = {s, li, n};
+            tasr_parallel(satt_job, &aj, H);
+            NE(ta, N_ATT);
+            s->nk = nk_save;
+        }
+        s_qlin_rows(s, &L->out, s->att, n, d, s->hb, d);
+        for (int i = 0; i < n * d; i++) x[i] += s->hb[i];
+        // conv module: GLU rows after the cached past rows, zeros after the chunk
+        float *gh = s->gh + (size_t)li * (2 * halo + C) * d;
+        nln_rows(x, n, d, L->n_conv, s->hb);
+        s_qlin_rows(s, &L->pw1, s->hb, n, d, s->h2, 2 * d);
+        for (int t = 0; t < n; t++) {
+            const float *g = s->h2 + (size_t)t * 2 * d;
+            float *o = gh + (size_t)(halo + t) * d;
+            for (int ch = 0; ch < d; ch++) o[ch] = g[ch] * nsig(g[d + ch]);
+        }
+        memset(gh + (size_t)(halo + n) * d, 0, sizeof(float) * halo * d);
+        {
+            NB(td);
+            ndw_t jd = {gh, s->att, L, n, d, m->k};  // att is free again: use it for the conv output
+            tasr_parallel(ndw_job, &jd, n);
+            NE(td, N_DW);
+        }
+        memmove(gh, gh + (size_t)n * d, sizeof(float) * halo * d);  // last halo inputs become the past rows
+        s_qlin_rows(s, &L->pw2, s->att, n, d, s->hb, d);
+        for (int i = 0; i < n * d; i++) x[i] += s->hb[i];
+        // FF2 + final LN
+        nln_rows(x, n, d, L->n_ff2, s->hb);
+        s_qlin_rows(s, &L->ff2_1, s->hb, n, d, s->h2, m->ff);
+        nsilu(s->h2, n * m->ff);
+        s_qlin_rows(s, &L->ff2_2, s->h2, n, m->ff, s->hb, d);
+        for (int t = 0; t < n; t++) {
+            float *r = x + (size_t)t * d;
+            for (int i = 0; i < d; i++) r[i] += 0.5f * s->hb[(size_t)t * d + i];
+            layernorm_row(r, d, L->n_out, r);
+        }
+    }
+    s->nk = k0 + n;
+    NB(thd);
+    s_qlin_rows(s, &m->head, x, n, d, s->lg, m->V + 1);
+    for (int t = 0; t < n; t++) s_emit(s, s->lg + (size_t)t * (m->V + 1));
+    NE(thd, N_HEAD);
+    s->t_chunk += n;
+}
+
+// ---- front end: encoder frame t2 from conv0 rows 2t2-1..2t2+1 (conv2 batched, sub_out per chunk)
+static const float *s_melrow(const struct tasr_nemo_stream *s, int t)
+{
+    if (t < 0 || (s->finished && t >= s->T0 - 1)) return NULL;  // row T0-1 (= n/160) is the zero frame
+    return s->mel + (size_t)(t % SMEL) * NMEL;
+}
+static void s_conv0_row(struct tasr_nemo_stream *s, int r)
+{
+    const tasr_nemo_t *m = s->m;
+    const int sc = m->sc, f1 = m->f1;
+    NB(tc0);
+    float P[3][NMEL + 2];
+    for (int dt = 0; dt < 3; dt++) {
+        const float *row = s_melrow(s, 2 * r - 1 + dt);
+        P[dt][0] = P[dt][NMEL + 1] = 0.f;
+        if (row) memcpy(&P[dt][1], row, sizeof(float) * NMEL);
+        else memset(&P[dt][1], 0, sizeof(float) * NMEL);
+    }
+    nc0_t j = {m, (const float(*)[NMEL + 2])P, s->c0ring + (size_t)(r % 3) * sc * (f1 + 2), s->cmw};
+    memset(s->cmw, 0, sizeof(float) * NW * (f1 + 2));
+    tasr_parallel(nc0_job, &j, sc);
+    float *cm = s->cmaxr + (size_t)(r % 3) * (f1 + 2);
+    for (int f = 0; f < f1 + 2; f++) {
+        float v = s->cmw[f];
+        for (int w = 1; w < NW; w++) v = s->cmw[(size_t)w * (f1 + 2) + f] > v ? s->cmw[(size_t)w * (f1 + 2) + f] : v;
+        cm[f] = v;
+    }
+    NE(tc0, N_CONV0);
+}
+static void s_flush_conv2(struct tasr_nemo_stream *s)
+{
+    const tasr_nemo_t *m = s->m;
+    const int sc = m->sc, f2 = m->f2;
+    if (!s->nbat) return;
+    {
+        int8_t *save = s->W.xq;
+        int ld = s->W.ldq;
+        s->W.xq = s->col; s->W.ldq = m->c2.kp;
+        nqlin(&s->W, &m->c2, s->nbat * f2, s->c2out, sc);
+        s->W.xq = save; s->W.ldq = ld;
+    }
+    for (int fb = 0; fb < s->nbat; fb++) {
+        const float *co = s->c2out + (size_t)fb * f2 * sc;
+        for (int f = 0; f < f2; f++)
+            for (int ch = 0; ch < sc; ch++) {
+                const float v = co[f * sc + ch];
+                s->fr[ch * f2 + f] = v > 0.f ? v : 0.f;
+            }
+        NB(tq);
+        tasr_quant_rows(s->fr, 1, sc * f2, sc * f2, s->xq_sub + (size_t)s->nflat * m->sub.kp, m->sub.kp, m->sub.kp,
+                        s->xs_sub + s->nflat);
+        NE(tq, N_QUANT);
+        s->nflat++;
+    }
+    s->nbat = 0;
+}
+static void s_run_chunk(struct tasr_nemo_stream *s)
+{
+    const tasr_nemo_t *m = s->m;
+    if (!s->nflat) return;
+    int8_t *save = s->W.xq;
+    float *save_s = s->W.xs;
+    int ld = s->W.ldq;
+    s->W.xq = s->xq_sub; s->W.ldq = m->sub.kp; s->W.xs = s->xs_sub;
+    nqlin(&s->W, &m->sub, s->nflat, s->x, m->d);
+    s->W.xq = save; s->W.ldq = ld; s->W.xs = save_s;
+    const float xscale = sqrtf((float)m->d);
+    for (int i = 0; i < s->nflat * m->d; i++) s->x[i] *= xscale;
+    const int n = s->nflat;
+    s->nflat = 0;
+    s_encode_chunk(s, n);
+}
+// advance the front end as far as the available audio allows (or to the end after finish)
+static void s_advance(struct tasr_nemo_stream *s)
+{
+    const tasr_nemo_t *m = s->m;
+    const int f2 = m->f2;
+    // mel frames whose samples are all present
+    {
+        int tend = s->finished ? s->T0 - 1 : (int)((s->n_samp - 200) / HOP) + 1;  // frames [mel_t, tend)
+        if (!s->finished && s->n_samp < 200) tend = 0;
+        if (tend > s->mel_t) {
+            NB(tf);
+            smel_t j = {s, s->mel_t, s->n_samp};
+            tasr_parallel(smel_job, &j, tend - s->mel_t);
+            s->mel_t = tend;
+            NE(tf, N_FEAT);
+        }
+    }
+    for (;;) {
+        const int t2 = s->t2_next;
+        if (s->finished ? t2 >= s->T : (4 * t2 + 3 >= s->mel_t)) break;  // needs mel rows up to 4 t2 + 3
+        for (int r = 2 * t2 - 1; r <= 2 * t2 + 1; r++) {
+            if (r < 0 || r < s->c0_next || (s->finished && r >= s->T1)) continue;
+            s_conv0_row(s, r);
+            s->c0_next = r + 1;
+        }
+        NB(tim);
+        {
+            nim_t j;
+            j.m = m;
+            j.col = s->col + (size_t)s->nbat * f2 * m->c2.kp;
+            j.xs = s->W.xs + s->nbat * f2;
+            for (int dt = 0; dt < 3; dt++) {
+                const int r = 2 * t2 - 1 + dt;
+                j.rows[dt] = (r >= 0 && !(s->finished && r >= s->T1)) ? s->c0ring + (size_t)(r % 3) * m->sc * (m->f1 + 2) : NULL;
+                j.cmax[dt] = s->cmaxr + (size_t)((r + 3) % 3) * (m->f1 + 2);
+            }
+            tasr_parallel(nim_job, &j, f2);
+        }
+        NE(tim, N_IM2COL);
+        s->t2_next++;
+        const int C2B = RB / f2 < 1 ? 1 : RB / f2;
+        if (++s->nbat == C2B || s->nflat + s->nbat == s->C) s_flush_conv2(s);
+        if (s->nflat == s->C) s_run_chunk(s);
+    }
+}
+
+tasr_nemo_stream_t *tasr_nemo_stream_new(const tasr_nemo_t *m, int chunk, int left, tasr_decoder_t *dec)
+{
+    if (!m || !m->nmean || m->rnnt) return NULL;  // needs a streaming-trained CTC model (fixed normalization)
+    nsig_init();
+    nexp_init();
+    struct tasr_nemo_stream *s = (struct tasr_nemo_stream *)tasr_alloc(sizeof(*s), 0);
+    if (!s) return NULL;
+    memset(s, 0, sizeof(*s));
+    const int d = m->d, H = m->h, dh = m->dh, dhp = m->dhp, nly = m->nl, f1 = m->f1, f2 = m->f2, sc = m->sc;
+    s->m = m;
+    s->C = chunk > 0 ? chunk : (m->s_chunk > 0 ? m->s_chunk : 16);
+    if (s->C > RB) s->C = RB;
+    const int lf = left > 0 ? left : (m->s_left > 0 ? m->s_left : 128);
+    s->nl = (lf + s->C - 1) / s->C;
+    s->Lc = (s->nl + 1) * s->C;
+    s->Lcp = (s->Lc + 15) & ~15;
+    s->OMAX = s->nl * s->C + s->C - 1;
+    s->NP = s->OMAX + s->C;
+    s->halo = m->k / 2;
+    s->dec = dec;
+    s->p8 = (int8_t *)tasr_alloc((size_t)nly * H * s->NP * dhp, 0);
+    s->sp = (float *)tasr_alloc(sizeof(float) * nly * H * s->NP, 0);
+    s->k8 = (int8_t *)tasr_alloc((size_t)nly * H * s->Lc * dhp, 0);
+    s->sk = (float *)tasr_alloc(sizeof(float) * nly * H * s->Lc, 0);
+    s->vt = (int8_t *)tasr_alloc((size_t)nly * H * dh * s->Lcp, 0);
+    s->sv = (float *)tasr_alloc(sizeof(float) * nly * H * s->Lc, 0);
+    s->gh = (float *)tasr_alloc(sizeof(float) * nly * (2 * s->halo + s->C) * d, 0);
+    s->mel = (float *)tasr_alloc(sizeof(float) * SMEL * NMEL, 1);
+    s->c0ring = (float *)tasr_alloc(sizeof(float) * 3 * sc * (f1 + 2), 0);
+    s->cmaxr = (float *)tasr_alloc(sizeof(float) * 3 * (f1 + 2), 1);
+    s->cmw = (float *)tasr_alloc(sizeof(float) * NW * (f1 + 2), 1);
+    const int C2B = RB / f2 < 1 ? 1 : RB / f2;
+    s->col = (int8_t *)tasr_alloc((size_t)C2B * f2 * m->c2.kp, 0);
+    s->c2out = (float *)tasr_alloc(sizeof(float) * C2B * f2 * sc, 0);
+    s->fr = (float *)tasr_alloc(sizeof(float) * sc * f2, 0);
+    s->xq_sub = (int8_t *)tasr_alloc((size_t)s->C * m->sub.kp, 0);
+    s->xs_sub = (float *)tasr_alloc(sizeof(float) * RB, 1);
+    s->x = (float *)tasr_alloc(sizeof(float) * s->C * d, 0);
+    s->W.m = m;
+    s->W.ldq = m->ff > 2 * d ? m->ff : 2 * d;
+    s->W.xq = (int8_t *)tasr_alloc((size_t)RB * s->W.ldq, 1);
+    s->W.xs = (float *)tasr_alloc(sizeof(float) * RB, 1);
+    for (int w = 0; w < NW; w++) {
+        s->W.wtmp[w] = (int8_t *)tasr_alloc(16 * s->W.ldq + 16, 1);
+        s->W.acc[w] = (int32_t *)tasr_alloc(sizeof(int32_t) * 64 * 16, 1);
+    }
+    s->hb = (float *)tasr_alloc(sizeof(float) * RB * d, 1);
+    const int w2 = 3 * d > m->ff ? 3 * d : m->ff;
+    s->h2 = (float *)tasr_alloc(sizeof(float) * RB * w2, 0);
+    s->att = (float *)tasr_alloc(sizeof(float) * s->C * d, 0);
+    s->prow = (float *)tasr_alloc(sizeof(float) * RB * d, 0);
+    s->qu = (int8_t *)tasr_alloc((size_t)H * s->C * dhp, 0);
+    s->qv = (int8_t *)tasr_alloc((size_t)H * s->C * dhp, 0);
+    s->squ = (float *)tasr_alloc(sizeof(float) * H * s->C, 0);
+    s->sqv = (float *)tasr_alloc(sizeof(float) * H * s->C, 0);
+    s->ia_n = s->Lcp > 64 ? s->Lcp : 64;
+    for (int w = 0; w < NW; w++) {
+        s->scb[w] = (float *)tasr_alloc(sizeof(float) * s->Lcp, 1);
+        s->pq[w] = (int8_t *)tasr_alloc(s->Lcp, 1);
+        s->ia[w] = (int32_t *)tasr_alloc(sizeof(int32_t) * 2 * s->ia_n, 1);
+    }
+    s->lg = (float *)tasr_alloc(sizeof(float) * s->C * (m->V + 1), 0);
+    s->lp = (float *)tasr_alloc(sizeof(float) * (m->V + 1), 0);
+    if (!s->p8 || !s->k8 || !s->vt || !s->gh || !s->h2 || !s->lg || !s->W.xq) { tasr_nemo_stream_free(s); return NULL; }
+    // positional rows for offsets OMAX..-(C-1), int8 once, then every layer's linear_pos per head
+    const int kpp = m->L[0].pos.kp;
+    float *pe = (float *)tasr_alloc(sizeof(float) * RB * d, 0);
+    for (int r0 = 0; r0 < s->NP; r0 += RB) {
+        const int rn = s->NP - r0 < RB ? s->NP - r0 : RB;
+        for (int r = 0; r < rn; r++) {
+            const double off = (double)(s->OMAX - (r0 + r));
+            for (int i = 0; i < d / 2; i++) {
+                const double a = off * exp((2.0 * i) * -(log(10000.0) / d));
+                pe[(size_t)r * d + 2 * i] = (float)sin(a);
+                pe[(size_t)r * d + 2 * i + 1] = (float)cos(a);
+            }
+        }
+        tasr_quant_rows(pe, rn, d, d, s->W.xq, kpp, kpp, s->W.xs);
+        const int ld = s->W.ldq;
+        s->W.ldq = kpp;
+        for (int li = 0; li < nly; li++) {
+            nqlin(&s->W, &m->L[li].pos, rn, s->prow, d);
+            for (int r = 0; r < rn; r++)
+                for (int hh = 0; hh < H; hh++) {
+                    const size_t g = sidx(s, li, hh);
+                    s->sp[g * s->NP + r0 + r] = qvec(s->prow + (size_t)r * d + hh * dh, dh, s->p8 + (g * s->NP + r0 + r) * dhp, dhp);
+                }
+        }
+        s->W.ldq = ld;
+    }
+    tasr_free(pe);
+    tasr_nemo_stream_reset(s);
+    return s;
+}
+
+void tasr_nemo_stream_reset(tasr_nemo_stream_t *s)
+{
+    const tasr_nemo_t *m = s->m;
+    s->n_samp = 0;
+    s->mel_t = s->c0_next = s->t2_next = s->finished = 0;
+    s->T0 = s->T1 = s->T = 0;
+    s->nbat = s->nflat = s->t_chunk = s->kbase = s->nk = 0;
+    s->prev = -1; s->len = 0; s->frames = 0; s->text[0] = 0;
+    memset(s->gh, 0, sizeof(float) * m->nl * (2 * s->halo + s->C) * m->d);
+    memset(s->vt, 0, (size_t)m->nl * m->h * m->dh * s->Lcp);
+    if (s->dec) tasr_decoder_reset(s->dec);
+}
+
+int tasr_nemo_stream_feed(tasr_nemo_stream_t *s, const int16_t *pcm, int n)
+{
+    if (s->finished) return s->frames;
+    for (int o = 0; o < n; o += SSLICE) {
+        const int k = n - o < SSLICE ? n - o : SSLICE;
+        for (int i = 0; i < k; i++) s->ring[(s->n_samp + i) & (SRING - 1)] = pcm[o + i];
+        s->n_samp += k;
+        s_advance(s);
+    }
+    return s->frames;
+}
+
+static void s_text(tasr_nemo_stream_t *s, char *text, int maxlen)
+{
+    const tasr_nemo_t *m = s->m;
+    if (!maxlen) return;
+    text[0] = 0;
+    int len = 0;
+    if (s->dec) {
+        int toks[2048];
+        const int nt = tasr_decoder_best(s->dec, toks, 2048);
+        for (int i = 0; i < nt; i++) {
+            const int nl = m->tok_len[toks[i]];
+            if (len + nl + 1 < maxlen) { memcpy(text + len, m->tok[toks[i]], nl); len += nl; text[len] = 0; }
+        }
+    } else {
+        len = s->len < maxlen - 1 ? s->len : maxlen - 1;
+        memcpy(text, s->text, len);
+        text[len] = 0;
+    }
+    if (text[0] == ' ') memmove(text, text + 1, strlen(text));
+}
+
+int tasr_nemo_stream_text(tasr_nemo_stream_t *s, char *text, int maxlen)
+{
+    s_text(s, text, maxlen);
+    return s->frames;
+}
+
+int tasr_nemo_stream_finish(tasr_nemo_stream_t *s, char *text, int maxlen)
+{
+    if (!s->finished) {
+        if (s->n_samp < 2 * HOP) {  // too short for the model: no frames (like tasr_nemo_transcribe)
+            s->finished = 1;
+            if (maxlen) text[0] = 0;
+            return 0;
+        }
+        s->finished = 1;
+        s->T0 = (int)(s->n_samp / HOP) + 1;
+        s->T1 = (s->T0 - 1) / 2 + 1;
+        s->T = (s->T1 - 1) / 2 + 1;
+        s_advance(s);
+        s_flush_conv2(s);
+        s_run_chunk(s);
+    }
+    s_text(s, text, maxlen);
+    return s->frames;
+}
+
+void tasr_nemo_stream_free(tasr_nemo_stream_t *s)
+{
+    if (!s) return;
+    void *p[] = {s->p8, s->sp, s->k8, s->sk, s->vt, s->sv, s->gh, s->mel, s->c0ring, s->cmaxr, s->cmw, s->col, s->c2out,
+                 s->fr, s->xq_sub, s->xs_sub, s->x, s->W.xq, s->W.xs, s->hb, s->h2, s->att, s->prow, s->qu, s->qv,
+                 s->squ, s->sqv, s->lg, s->lp};
+    for (size_t i = 0; i < sizeof(p) / sizeof(p[0]); i++) if (p[i]) tasr_free(p[i]);
+    for (int w = 0; w < NW; w++) {
+        if (s->W.wtmp[w]) tasr_free(s->W.wtmp[w]);
+        if (s->W.acc[w]) tasr_free(s->W.acc[w]);
+        if (s->scb[w]) tasr_free(s->scb[w]);
+        if (s->pq[w]) tasr_free(s->pq[w]);
+        if (s->ia[w]) tasr_free(s->ia[w]);
+    }
+    tasr_free(s);
+}
+
+void tasr_nemo_stream_set_sink(tasr_nemo_stream_t *s, float *logits, int max_frames)
+{
+    s->sink = logits;
+    s->sink_max = max_frames;
+}
+int tasr_nemo_stream_supported(const tasr_nemo_t *m) { return m && m->nmean && !m->rnnt; }

@@ -17,4 +17,4 @@ timeout 7200 "$QEMU" -nographic -machine esp32s3 -m 8M \
 QPID=$!
 until grep -qE "^DONE|abort|Guru|load failed|no audio partition" "$OUT/qemu.txt" 2>/dev/null; do sleep 3; done
 kill $QPID 2>/dev/null || true
-grep -E "CALIB|tinyasr:|UTT|REF|HYP|TOTAL|MEM|PROF|abort|Guru" "$OUT/qemu.txt"
+grep -E "CALIB|tinyasr:|UTT|REF|HYP|TOTAL|MEM|PROF|STREAM|abort|Guru" "$OUT/qemu.txt"

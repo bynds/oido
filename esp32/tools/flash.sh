@@ -9,6 +9,7 @@ set -e
 PORT=$1; MODEL=$(cd "$(dirname "$2")" && pwd)/$(basename "$2"); shift 2
 LM=""; if [[ "${1:-}" == *.tlm ]]; then LM=$(cd "$(dirname "$1")" && pwd)/$(basename "$1"); shift; fi
 DEFLM="$(cd "$(dirname "$0")/../.." && pwd)/models/nemo_lm.tlm"
+[ -f "${MODEL%.tnm}.tlm" ] && DEFLM="${MODEL%.tnm}.tlm"   # a model's own LM (oido_es.tlm), else the English one
 [ -z "$LM" ] && [ -z "$NO_LM" ] && [[ "$MODEL" == *.tnm ]] && [ -f "$DEFLM" ] && LM=$DEFLM
 [ -n "$NO_LM" ] && LM=""
 WAVS=(); REFS=()

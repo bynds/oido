@@ -82,11 +82,51 @@ void run_mic_nemo(const tasr_nemo_t *m, struct tasr_decoder *dec)
     static char text[4096];
     static tasr_seg_t seg;
     tasr_seg_init(&seg, utt, cap);
-    printf("ready: speak, the transcript prints after each pause\n");
+    seg.hang = CONFIG_TASR_SEG_HANG_MS / 20;  // 320-sample blocks
     oled_start();
     char idle[32] = "* listening";
     oled_status(idle);
     int hearing = 0;
+    tasr_nemo_stream_t *st = tasr_nemo_stream_new(m, 0, 0, dec);
+    if (st) {  // streaming model: the encoder runs while you speak; only the last chunk is left when you stop
+        printf("ready (streaming): speak, partial text follows you, the final line prints after each pause\n");
+        int fed = 0;
+        for (;;) {
+            size_t got = xStreamBufferReceive(g_ring, in, sizeof(in), portMAX_DELAY);
+            const int n = tasr_seg_feed(&seg, in, (int)(got / 2));
+            if (hearing && !seg.speech && !n) {  // a blip the segmenter discarded: forget what the stream heard
+                tasr_nemo_stream_reset(st);
+                fed = 0;
+                oled_status(idle);
+            }
+            hearing = seg.speech;
+            if (!seg.speech && !n) continue;
+            const int have = n ? n : seg.n;
+            if (have > fed) {
+                const int before = tasr_nemo_stream_text(st, NULL, 0);
+                if (tasr_nemo_stream_feed(st, utt + fed, have - fed) > before) {
+                    tasr_nemo_stream_text(st, text, sizeof(text));
+                    printf("\r... %s", text);
+                    fflush(stdout);
+                    oled_partial(text);
+                }
+                fed = have;
+            }
+            if (!n) continue;
+            int64_t t0 = esp_timer_get_time();
+            tasr_nemo_stream_finish(st, text, sizeof(text));
+            const double dt = (esp_timer_get_time() - t0) / 1e6;
+            printf("\r%s   [%.1f s audio, final text %.0f ms after the pause was detected]\n", text, n / 16000.0, dt * 1000);
+            oled_push(text[0] ? text : "(nothing recognized)");
+            snprintf(idle, sizeof(idle), "* listening  +%.0f ms", dt * 1000);
+            oled_status(idle);
+            tasr_nemo_stream_reset(st);
+            fed = 0;
+            hearing = 0;
+            tasr_seg_next(&seg);
+        }
+    }
+    printf("ready: speak, the transcript prints after each pause\n");
     for (;;) {
         size_t got = xStreamBufferReceive(g_ring, in, sizeof(in), portMAX_DELAY);
         const int n = tasr_seg_feed(&seg, in, (int)(got / 2));

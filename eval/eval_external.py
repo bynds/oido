@@ -1,20 +1,27 @@
 """External small-model baselines on our test sets with the same normalization (for context in the report).
 
 python eval_external.py whisper-tiny.en|moonshine-tiny|vosk-small|nemo-small [--limit N] [--manifest a.jsonl b.jsonl ...]
+python eval_external.py whisper-tiny --lang es --limit 500 --manifest test_cv.jsonl ...   # Spanish: forced language,
+    digits in hypotheses spelled out (num2words), Spanish normalization (train/data.py clean_text_es) on both sides
 """
 import argparse, json, os, sys, time
 import numpy as np, soundfile as sf
 from wer_utils import load_librispeech, wer
 
 VAL = os.path.join(os.path.dirname(__file__), "..", "data", "val")
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "train"))  # data.CLEANERS for non-English sets
 
 
-def sets(limit, manifests=None):
+def sets(limit, manifests=None, lang="en"):
     out = []
     if manifests:
         for m in manifests:
             its = [json.loads(l) for l in open(m)]
-            its = [(d["id"], d["wav"], d["text"]) for d in its]
+            if lang != "en":  # same utterances and references as the on-chip evaluation (digits filtered)
+                from data import CLEANERS
+                its = [dict(d, text=CLEANERS[lang](d["text"])) for d in its]
+                its = [d for d in its if d["text"]]
+            its = [(d.get("id", d["wav"]), d["wav"], d["text"]) for d in its]
             out.append((os.path.basename(m).replace(".jsonl", ""), its[:: max(1, len(its) // limit)][:limit] if limit else its))
         return out
     for s in ["test-clean", "test-other"]:
@@ -51,6 +58,7 @@ def main():
     ap.add_argument("model")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--manifest", nargs="*", default=[])
+    ap.add_argument("--lang", default="en")
     a = ap.parse_args()
     if a.model.startswith("whisper"):
         import torch
@@ -58,13 +66,14 @@ def main():
         name = "openai/" + a.model
         proc = WhisperProcessor.from_pretrained(name)
         model = WhisperForConditionalGeneration.from_pretrained(name).eval()
-        dev = "mps" if torch.backends.mps.is_available() else "cpu"
+        dev = "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu")
         model = model.to(dev)
 
         def transcribe(batch):
             feats = proc([b for b in batch], sampling_rate=16000, return_tensors="pt").input_features.to(dev)
             with torch.no_grad():
-                ids = model.generate(feats, max_new_tokens=200)
+                kw = {} if a.model.endswith(".en") else {"language": a.lang, "task": "transcribe"}
+                ids = model.generate(feats, max_new_tokens=200, **kw)
             return proc.batch_decode(ids, skip_special_tokens=True)
         bs = 16
     elif a.model == "nemo-small":
@@ -99,7 +108,18 @@ def main():
             return [tok.decode_batch(model.generate(b[None].astype(np.float32)))[0] for b in batch]
         bs = 1
     res = {}
-    for name, items in sets(a.limit, a.manifest):
+    if a.lang != "en":
+        import re, jiwer
+        from num2words import num2words
+        from data import CLEANERS
+
+        def norm(t):
+            t = re.sub(r"\d+", lambda m: " " + num2words(int(m.group()), lang=a.lang) + " ", t)
+            return CLEANERS[a.lang](t)
+
+        def wer(refs, hyps):  # noqa: F811
+            return 100 * jiwer.wer(refs, [norm(h) or "-" for h in hyps]), None
+    for name, items in sets(a.limit, a.manifest, a.lang):
         t = time.time()
         hyps = []
         for i in range(0, len(items), bs):
