@@ -1,0 +1,16 @@
+{"model": "oido_es.tnm (NVIDIA conformer-ctc-small fine-tuned for Spanish, int8, streaming-capable) + oido_es.tlm (GRU LM, weights 0.5 / token bonus 1.5, beam 4)",
+ "wer_full_test_sets": {
+  "note": "complete test sets: Common Voice 17 es (15,857 utts, 26.9 h), MLS es (2,385, 10.0 h), VoxPopuli es (1,528, 5.0 h), FLEURS es_419 (745 with digit-free references, 2.5 h)",
+  "greedy": {"common_voice": 19.99, "mls": 14.53, "voxpopuli": 20.25, "fleurs": 16.62},
+  "lm": {"common_voice": 13.75, "mls": 10.90, "voxpopuli": 15.68, "fleurs": 11.32},
+  "stream32_lm": {"common_voice": 15.39, "mls": 12.27, "voxpopuli": 16.73, "fleurs": 12.80}},
+ "wer_400_utterance_subsets": {
+  "note": "400 evenly spaced utterances per set (333 for FLEURS after dropping references with digits), the subsets Whisper tiny was scored on",
+  "oido_greedy": {"common_voice": 20.30, "mls": 14.21, "voxpopuli": 20.02, "fleurs": 16.92},
+  "oido_lm": {"common_voice": 13.25, "mls": 10.63, "voxpopuli": 15.49, "fleurs": 11.31},
+  "oido_stream32_lm": {"common_voice": 15.20, "mls": 12.11, "voxpopuli": 16.28, "fleurs": 12.80},
+  "whisper_tiny_multilingual_fp32_laptop": {"common_voice": 32.95, "mls": 21.45, "voxpopuli": 28.65, "fleurs": 17.13}},
+ "normalization": "lowercase, accents kept (a e i o u with acute, u with diaeresis, n with tilde), punctuation removed; references containing digits are excluded; Whisper hypotheses have numerals spelled out (num2words)",
+ "lm_weights": "0.5 / 1.5 chosen from a small grid (0.3-0.7 x 0.5-2.0) on the 400-utterance test subsets; the optimum is flat (all of 0.4-0.6 with bonus 1.5-2.0 within 0.2 absolute mean WER)",
+ "training": "phase 1: 25k steps, phase 2: 5k, final: 70k steps on 2,492 h (Common Voice es train + unvalidated clips kept when NVIDIA stt_es_conformer_ctc_large agrees within 15% WER, VoxPopuli es, MLS es, FLEURS es_419) with MUSAN noise/music/babble and simulated reverberation",
+ "date": "2026-10-03"}

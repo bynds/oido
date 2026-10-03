@@ -34,6 +34,22 @@ chunks, with fixed feature normalization, and quantized to int8. Fine-tuning dat
 Because of the share-alike sources, oido_stream.tnm is released under CC-BY-SA-4.0,
 https://creativecommons.org/licenses/by-sa/4.0/.
 
+models/oido_es.tnm is the same NVIDIA model with a new 1,024-piece Spanish SentencePiece vocabulary
+(models/oido_es/tokenizer.model, trained by Lokutor on the training transcripts), fine-tuned by Lokutor for Spanish and
+quantized to int8. Fine-tuning data (2,492 hours):
+- Common Voice 17 Spanish (CC0), including its unvalidated clips, which were kept only where NVIDIA's
+  stt_es_conformer_ctc_large (CC-BY-4.0, https://huggingface.co/nvidia/stt_es_conformer_ctc_large) transcribed them
+  within 15% word error rate of the reference; that model's output is used only to discard clips and is not part of
+  this release;
+- VoxPopuli Spanish (CC0), Multilingual LibriSpeech Spanish (CC-BY-4.0), FLEURS es_419 (CC-BY-4.0);
+- augmentation with noise, music and speech from MUSAN (CC-BY-4.0) and simulated room impulse responses.
+All sources are CC0 or CC-BY, so oido_es.tnm is released under CC-BY-4.0, https://creativecommons.org/licenses/by/4.0/.
+
+models/oido_es.tlm is a GRU language model (1.3 M parameters) over the Spanish vocabulary, trained by Lokutor on the
+Multilingual LibriSpeech Spanish LM corpus (public-domain book text, CC-BY-4.0, https://www.openslr.org/94/), the Common
+Voice Spanish sentence collection (CC0) and VoxPopuli Spanish transcripts (CC0), with every development and test
+sentence removed. It is released under CC-BY-4.0. Its recommended beam-search weights are stored in its header.
+
 models/nemo_lm.tlm is a GRU language model (1.3 M parameters) trained by Lokutor on the LibriSpeech language-modeling
 corpus (public domain text from 14,500 books, https://www.openslr.org/11/), over the vocabulary of NVIDIA's tokenizer. It
 is released under CC-BY-4.0.

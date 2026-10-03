@@ -7,7 +7,7 @@
 *Animated demo; [full video with sound](https://huggingface.co/lokutor-ai/oido-ctc-small-int8/blob/main/demo.mp4).
 The transcripts are Oído's output, sped up. Footage from a physical board is coming.*
 
-Speech-to-text for any English sentence, running entirely on an **ESP32-S3** (240 MHz dual-core Xtensa LX7, 8 MB PSRAM,
+Speech-to-text for any English or Spanish sentence, running entirely on an **ESP32-S3** (240 MHz dual-core Xtensa LX7, 8 MB PSRAM,
 16 MB flash). No cloud, no command list, no neural accelerator. Built by [Lokutor](https://lokutor.com).
 Models on Hugging Face: [int8](https://huggingface.co/lokutor-ai/oido-ctc-small-int8) ·
 [int4](https://huggingface.co/lokutor-ai/oido-ctc-small-int4).
@@ -57,6 +57,38 @@ full numbers in [`results/robustness.json`](results/robustness.json)):
 
 For the transducer, car and kitchen noise at 5 dB SNR cost under 1 point, and living-room noise about 1.7. Four-talker babble at 5 dB and very
 reverberant rooms are the hard cases.
+
+## Spanish
+
+`models/oido_es.tnm` + `models/oido_es.tlm` is a Spanish model for the same chip and engine: NVIDIA's Conformer
+fine-tuned on 2,492 hours of Spanish (Common Voice, VoxPopuli, Multilingual LibriSpeech, FLEURS) with noise and
+reverberation augmentation and a new Spanish vocabulary, plus a Spanish language model. 14.0 MB + 1.3 MB, the same speed
+as the English model.
+
+Word error rate (%), same normalization for every system (lowercase, accents kept, punctuation removed, references with
+digits excluded), on the same 400 evenly spaced utterances per test set (333 for FLEURS, after dropping references with digits):
+
+| System | Runs on | Common Voice | MLS | VoxPopuli | FLEURS |
+|---|---|---|---|---|---|
+| **Oído Spanish + language model** | ESP32-S3 | **13.3** | **10.6** | **15.5** | **11.3** |
+| Oído Spanish, greedy | ESP32-S3 | 20.3 | 14.2 | 20.0 | 16.9 |
+| Oído Spanish, streaming (32-frame chunks) + language model | ESP32-S3 | 15.2 | 12.1 | 16.3 | 12.8 |
+| Whisper tiny (multilingual), fp32 | laptop | 33.0 | 21.5 | 28.7 | 17.1 |
+
+On the complete test sets (60 hours) the numbers are 13.8 / 10.9 / 15.7 / 11.3 with the language model
+([`results/es_benchmark.json`](results/es_benchmark.json)).
+
+- **Read this fairly.** Oído was fine-tuned on the training splits of these corpora, while Whisper tiny is zero-shot, so
+  the comparison favors us on these domains; on phone calls, strong regional accents or specialized vocabulary expect
+  higher error. We have not built a Spanish noise benchmark; the model is trained with the same noise and reverberation
+  augmentation as the English streaming model.
+- The language model weights (0.5 / 1.5) were picked from a small grid on subsets of the test sets; the optimum is flat
+  (all of 0.4–0.6 / 1.5–2.0 are within 0.2 points).
+- The model writes numbers as words (*veinte*), not digits.
+- Under Espressif's emulator the firmware's transcripts match the laptop build on most utterances; on uncertain ones the
+  last-bit rounding of the math library can change a word (2 of 3 clips we compared). Speed on silicon is estimated, as
+  for English.
+- It works in both modes: `python live_demo.py --model es` streams, and utterance mode runs the same file.
 
 ## Speed and memory
 
@@ -120,6 +152,7 @@ cd esp32/host && make
 python live_demo.py                                   # microphone -> the firmware's VAD + engine, with ESP32 time estimates
 python live_demo.py --model fast --no_lm              # int4, greedy decoding
 python live_demo.py --model stream                    # low latency: words appear while you speak (--pause 0.5 for a shorter pause)
+python live_demo.py --model es                        # Spanish (models/oido_es.tnm + oido_es.tlm)
 ```
 
 **On a board.** ESP32-S3-DevKitC-1 **N16R8**, an INMP441 I2S microphone (SCK→GPIO4, WS→GPIO5, SD→GPIO6, L/R→GND),
@@ -161,12 +194,12 @@ train/                     PyTorch port of NVIDIA's model (nemo_small.py, rnnt_s
 eval/                      WER normalization, robustness benchmark builder, laptop baselines
 results/                   benchmark outputs behind the numbers above
 models/                    nemo8.tnm (int8, 14.0 MB), nemo4.tnm (int4, 8.3 MB), oido_stream.tnm (streaming int8, 14.0 MB),
-                           nemo_lm.tlm (language model, 1.3 MB), and the tokenizer
+                           nemo_lm.tlm (language model, 1.3 MB), oido_es.tnm + oido_es.tlm (Spanish, 14.0 + 1.3 MB), and the tokenizers
 ```
 
 ## Limitations
 
-- English only.
+- English and Spanish only.
 - Utterance mode prints text after each utterance; streaming mode shows partial text but is less accurate (see above).
 - Very noisy crowds and reverberant rooms remain hard.
 - Speed is estimated until board measurements are published.
@@ -179,6 +212,7 @@ models/                    nemo8.tnm (int8, 14.0 MB), nemo4.tnm (int4, 8.3 MB), 
   firmware), Lokutor offers commercial licenses and support. See [`COMMERCIAL.md`](COMMERCIAL.md).
 - **Model weights** are derived from NVIDIA's `stt_en_conformer_ctc_small`: `nemo8.tnm` is under **CC-BY-4.0**,
   while `nemo4.tnm` and `oido_stream.tnm` (fine-tuned on public corpora that include share-alike data) are under
-  **CC-BY-SA-4.0**. The language model `nemo_lm.tlm` is under **CC-BY-4.0**. See [`NOTICE`](NOTICE).
+  **CC-BY-SA-4.0**. The language model `nemo_lm.tlm` is under **CC-BY-4.0**. The Spanish model `oido_es.tnm`
+  (fine-tuned only on CC0 and CC-BY data) and its language model `oido_es.tlm` are under **CC-BY-4.0**. See [`NOTICE`](NOTICE).
 
-Lokutor also has Spanish and other-language models and an on-device TTS for the same chip. Contact us for these.
+Lokutor also has models for other languages (Catalan, Basque, Galician and more) and an on-device TTS for the same chip. Contact us for these.
