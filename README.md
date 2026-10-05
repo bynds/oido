@@ -23,6 +23,25 @@ it took on the chip.
 > Real-time speed is **estimated** from exact emulator instruction counts. Measurements on physical boards follow in the
 > next days and will be added here.
 
+## Which model should I use?
+
+There is **one model per language**, and the models that stream also run in full-context ("utterance") mode.
+
+| I want | Use | Language | Modes | Size | License |
+|---|---|---|---|---|---|
+| The best English accuracy | `models/nemo8.tnm` + `nemo_lm.tlm` ([Hugging Face](https://huggingface.co/lokutor-ai/oido-ctc-small-int8)) | English | utterance only: text about 3 s after you stop | 14.0 + 1.3 MB | CC-BY-4.0 |
+| English with the least flash | `models/nemo4.tnm` ([Hugging Face](https://huggingface.co/lokutor-ai/oido-ctc-small-int4)) | English | utterance only | 8.3 MB | CC-BY-SA-4.0 |
+| English, low latency (voice agents) | `models/oido_stream.tnm` ([Hugging Face](https://huggingface.co/lokutor-ai/oido-ctc-small-stream-int8)) | English | **streaming** (final text about 1.1-1.4 s after you stop, estimated) and full-context | 14.0 MB | CC-BY-SA-4.0 |
+| Spanish | `models/oido_es.tnm` + `oido_es.tlm` ([Hugging Face](https://huggingface.co/lokutor-ai/oido-es-ctc-small-int8)) | Spanish | **streaming and full-context, in the same file** | 14.0 + 1.3 MB | CC-BY-4.0 |
+
+- **Streaming vs utterance:** `oido_stream.tnm` and `oido_es.tnm` carry a streaming flag. The firmware's microphone mode and
+  `live_demo.py` stream with them automatically; the full-context (utterance) accuracy figures in the tables come from the
+  same files run through `tasr_nemo_transcribe` / `eval_engine.py`. The original English models (`nemo8`, `nemo4`) are
+  utterance-only.
+- **What streaming costs:** some accuracy (English LibriSpeech 4.9 / 11.0 instead of 3.3 / 7.2 with the language model),
+  and estimated speed on the real chip is still unmeasured.
+- **No bilingual model:** English and Spanish have different vocabularies, so each is its own file.
+
 ## Accuracy
 
 Word error rate (%) on LibriSpeech, same text normalization for every system.
