@@ -1,0 +1,36 @@
+file	samples	audio_s	frames	wall_ms	cpu_ms	wall_rtf	cpu_rtf	truncated	text
+edge_cut_100.wav	100	0.006	0	1.1	1.1	0.1764	0.1837	0	
+edge_cut_16000.wav	16000	1.000	26	4760.7	3362.7	4.7607	3.3627	0	it is such
+edge_cut_319.wav	319	0.020	0	1.5	1.5	0.0732	0.0761	0	
+edge_cut_320.wav	320	0.020	1	181.4	152.2	9.0702	7.6124	0	
+edge_cut_321.wav	321	0.020	1	166.1	164.9	8.2806	8.2201	0	
+edge_cut_641.wav	641	0.040	2	370.9	202.8	9.2571	5.0612	0	
+edge_noise_3s.wav	48000	3.000	76	14467.1	11104.7	4.8224	3.7016	0	
+edge_silence_3s.wav	48000	3.000	76	11731.5	9063.7	3.9105	3.0212	0	i
+real_20.wav	99648	6.228	156	28220.4	23180.0	4.5312	3.7219	0	no such authority was given for the course of peal whose registries remained closed
+real_21.wav	122688	7.668	192	33435.9	27550.4	4.3604	3.5929	0	the performance was recorded and later released on a live album titled late orchestration
+real_22.wav	92160	5.760	145	24615.7	20970.2	4.2736	3.6407	0	he has been locked up so long he has been mostly forgotten about
+real_23.wav	60159	3.760	94	13523.7	13130.4	3.5968	3.4922	0	the qaari government and the football authorities must take notice
+real_24.wav	127040	7.940	199	36008.1	28145.5	4.5350	3.5448	0	the court still sees scope for further improving the quality of spending by simply applying the current system to its full potential
+real_25.wav	57121	3.570	90	16379.2	12172.6	4.5879	3.4096	0	so that indicates a t menu under that menu
+real_26.wav	61440	3.840	97	18998.0	13596.0	4.9474	3.5406	0	yeah i think of it in terms of you know not even maybe to what
+rooms_00.wav	111920	6.995	175	33249.7	24938.4	4.7533	3.5652	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_01.wav	111920	6.995	175	26137.0	25532.9	3.7365	3.6502	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_02.wav	111920	6.995	175	28256.2	26211.4	4.0395	3.7472	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_03.wav	111920	6.995	175	27020.4	25872.6	3.8628	3.6987	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_04.wav	111920	6.995	175	28178.0	26383.2	4.0283	3.7717	0	it is such a noble ambition that it is a pity it has usually such shallow foundation
+rooms_05.wav	111920	6.995	175	24818.3	24453.2	3.5480	3.4958	0	it is such a noble ambition that it is a pity it has usually such a shallow foundination wood
+rooms_06.wav	111920	6.995	175	25824.0	25337.5	3.6918	3.6222	0	don't you is such a nole ambition between that it is a pity it has such a shallow dodination ofian
+rooms_07.wav	111920	6.995	175	24416.9	23876.3	3.4906	3.4133	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_08.wav	111920	6.995	175	26900.8	25746.4	3.8457	3.6807	0	it is such an nombition that it is a pity it has usually such a shallow foundation
+rooms_09.wav	111920	6.995	175	24411.9	24145.7	3.4899	3.4519	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_10.wav	169600	10.600	266	37802.3	37118.9	3.5663	3.5018	0	in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event
+rooms_11.wav	169600	10.600	266	40152.1	38366.4	3.7879	3.6195	0	in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event
+rooms_12.wav	169600	10.600	266	39547.8	38852.2	3.7309	3.6653	0	in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event
+rooms_13.wav	169600	10.600	266	48776.7	39504.9	4.6016	3.7269	0	in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event
+rooms_14.wav	169600	10.600	266	49117.0	38895.4	4.6337	3.6694	0	in actual fact there are doubtless various factors that concur in giving us the feeling the greater or less remoteness than some li againstanced
+rooms_15.wav	169600	10.600	266	52508.9	39998.7	4.9537	3.7735	0	in actual fact there are doubtless various factors that concur in giving us to feeling a greater or less remoteness and some member defs
+rooms_16.wav	169600	10.600	266	55032.8	40191.0	5.1918	3.7916	0	in actual fact there are doubtless various factors that concur by giving a sps or greater or less remote and some like
+rooms_17.wav	169600	10.600	266	44302.2	37850.0	4.1795	3.5708	0	in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event
+rooms_18.wav	169600	10.600	266	42341.6	38500.9	3.9945	3.6322	0	in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembermbered event
+rooms_19.wav	169600	10.600	266	39321.8	37124.6	3.7096	3.5023	0	in actual fact there are doubtless various factors that occur in giving us the feeling a greater or less remoteness and some remembered event

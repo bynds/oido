@@ -1,0 +1,6 @@
+ok   ./build/jibo-scalar/tasr_cli  (GLIBC_2.4 )
+     arch v7, fpu VFPv3, simd NEONv1, needs libm.so.6 libc.so.6 ld-linux-armhf.so.3 
+ok   ./build/jibo-scalar/oido_cli  (GLIBC_2.17 GLIBC_2.4 )
+     arch v7, fpu VFPv3, simd NEONv1, needs libm.so.6 libc.so.6 ld-linux-armhf.so.3 
+ok   ./build/jibo-scalar/libm_fingerprint  (GLIBC_2.4 )
+     arch v7, fpu VFPv3, simd NEONv1, needs libm.so.6 libc.so.6 

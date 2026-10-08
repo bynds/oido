@@ -1,0 +1,8 @@
+label: host-scalar-stream-model-fullctx
+binary: build/host/oido_cli (24cb3b8dce72c1f35018bac9b9b4e3042702a0278da1568c51a943f7c5f78cd9)
+model: models/oido_stream.tnm (d815ad97ab3def101a267531db0778395c7e8eab9c09571ae4cabca71f5faa11)
+runner: native
+jobs: 1
+host: Linux 6.18.44-fc-v80 x86_64; Intel(R) Xeon(R) Processor @ 2.10GHz
+date: 2026-10-08T08:03:33Z
+exit: 0

@@ -16,3 +16,5 @@ models/rnnt8.tnm
 __pycache__/
 *.pyc
 .DS_Store
+# Jibo port: regenerated binaries, fixtures, logits and run directories
+/build/

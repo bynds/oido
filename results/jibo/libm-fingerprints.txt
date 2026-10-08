@@ -1,0 +1,5 @@
+# libm_fingerprint output (logf/expf result hashes)
+host x86-64 glibc 2.39:          logf 8388606 inputs 0c2085bb; expf 327681 inputs b22e2a03
+qemu-arm, sysroot glibc 2.21:    logf 8388606 inputs 95cbba12; expf 327681 inputs 372829a9
+qemu-arm, Ubuntu cross glibc 2.39: logf 8388606 inputs 0c2085bb; expf 327681 inputs b22e2a03
+glibc 2.21 vs 2.39: logf differs on 155,536 of 8,388,606 inputs (1 ulp each); expf on 202 of 327,681 (1 ulp each)

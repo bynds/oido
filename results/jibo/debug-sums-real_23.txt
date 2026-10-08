@@ -1,0 +1,24 @@
+# TASR_DEBUG_SUMS FNV hashes per stage, real_23.wav
+# stage idx host-glibc2.39 qemu-arm-glibc2.21 qemu-arm-glibc2.39
+twre 0 42a33bdf 42a33bdf 42a33bdf
+twim 0 fd756fd5 fd756fd5 fd756fd5
+logmel 0 bd0a489b c866b2d1 bd0a489b
+feat 0 8d9127e3 cdc78d50 8d9127e3
+sub 0 e2fa8b41 3ad23e20 e2fa8b41
+pe 0 750c15ed 750c15ed 750c15ed
+layer 0 45b0d54a cc4d3e67 45b0d54a
+layer 1 c5015078 6dd573e2 c5015078
+layer 2 e5868570 1551ca38 e5868570
+layer 3 dad9838c 6367838c dad9838c
+layer 4 4b2135a1 2ef1d3f0 4b2135a1
+layer 5 5d55d47a 085dc515 5d55d47a
+layer 6 fd244382 83ee6beb fd244382
+layer 7 c0fe7e85 12d269de c0fe7e85
+layer 8 b6130038 9e94bd9e b6130038
+layer 9 e55c8ed2 db0be710 e55c8ed2
+layer 10 78fbc6cc 6431091f 78fbc6cc
+layer 11 e31b2384 fda3a90d e31b2384
+layer 12 ea8aa6c2 de40f2e7 ea8aa6c2
+layer 13 f323d2b6 94703e88 f323d2b6
+layer 14 efef5c14 6347d857 efef5c14
+layer 15 502a321f e1b095b6 502a321f

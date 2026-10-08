@@ -1,0 +1,5 @@
+compiler: cc
+cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+flags: -O2 -std=c11 -D_DEFAULT_SOURCE -D_POSIX_C_SOURCE=200809L -ffp-contract=off -fno-fast-math -fno-tree-vectorize -DTASR_NO_SIMD -I./esp32/components/tinyasr/include -I./esp32/components/tinyasr -Wall -Wno-unused-function 
+link:  -lm
+source: f1d1ca0527495a5327b82857233fd90de3ad43ef

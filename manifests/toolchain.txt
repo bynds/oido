@@ -1,0 +1,15 @@
+Stand-in Jibo toolchain used for build/jibo-scalar (the owner's jibo-armcc wrapper, Linaro GCC 4.8.4, was not
+available in this environment; rebuild with JIBO_CC=<wrapper> when it is).
+
+compiler   Ubuntu 24.04 gcc-arm-linux-gnueabihf 13.3.0-6ubuntu2~24.04.1 (arm-linux-gnueabihf-gcc), apt
+emulator   Ubuntu 24.04 qemu-user 1:8.2.2+ds-0ubuntu1.18 (qemu-arm), apt; correctness only, never timing
+host       ffmpeg 6.1.1-3ubuntu5 (fixture decoding)
+
+sysroot    glibc 2.21, the same version as Jibo's, from Ubuntu 15.04 (vivid) armhf packages, extracted with
+           dpkg-deb -x and with absolute symlinks pointed inside the sysroot:
+  7a6aaf93c7ad15d96e303eb916112af66ee2bc981d90e4506d7c9b50d7592865  libc6_2.21-0ubuntu4.3_armhf.deb
+  a7a291e6d374da47eb800060c0037104bc05bd13e6c66562ae7bc0eb716a1899  libc6-dev_2.21-0ubuntu4.3_armhf.deb
+  8a3b3b5cf39f10eb3ce13af803889c1faf092d3b987b0034d053242c182782f6  linux-libc-dev_3.13.0-170.220_armhf.deb
+           from http://old-releases.ubuntu.com/ubuntu/pool/main/g/glibc/ and
+           http://ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/ . The Decider port's Debian 8 glibc 2.19
+           packages (archive.debian.org) were not reachable from this environment's network policy.

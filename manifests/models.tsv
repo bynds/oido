@@ -1,0 +1,4 @@
+file	bytes	sha256	magic	d	heads	ff	conv_k	layers	sub_ch	vocab	bits	flags	stream_chunk	stream_left
+models/nemo8.tnm	13982621	452e332e21f46f161e383a1f26f36294785b2782cb3252928841dd7e6480c68b	TNM1	176	4	704	31	16	176	1024	8	0	0	0
+models/oido_stream.tnm	13983264	d815ad97ab3def101a267531db0778395c7e8eab9c09571ae4cabca71f5faa11	TNM1	176	4	704	31	16	176	1024	8	3	32	128
+models/nemo_lm.tlm	1288852	00f174f83ad70d865301304fd51897839c542d6f887f8e93e4e1b83938566a1f	TLM1

@@ -1,0 +1,46 @@
+model ./models/nemo8.tnm: 13982621 bytes, read 85.0 ms, load 16.8 ms, weights 13894264 bytes, engine allocations 365468 bytes
+edge_cut_100.wav: engine peak working allocations 0 bytes
+edge_cut_321.wav: engine peak working allocations 641160 bytes
+real_20.wav: engine peak working allocations 1216320 bytes
+real_24.wav: engine peak working allocations 1377720 bytes
+rooms_01.wav: engine peak working allocations 1286584 bytes
+rooms_05.wav: engine peak working allocations 1286584 bytes
+rooms_09.wav: engine peak working allocations 1286584 bytes
+rooms_13.wav: engine peak working allocations 1627024 bytes
+rooms_17.wav: engine peak working allocations 1627024 bytes
+peak RSS 26652 KiB; engine allocations 357 calls, 0 bytes outstanding after free; 0 failure(s)
+model ./models/nemo8.tnm: 13982621 bytes, read 55.9 ms, load 10.3 ms, weights 13894264 bytes, engine allocations 365468 bytes
+edge_cut_16000.wav: engine peak working allocations 732336 bytes
+edge_cut_641.wav: engine peak working allocations 644688 bytes
+real_21.wav: engine peak working allocations 1349792 bytes
+real_25.wav: engine peak working allocations 970544 bytes
+rooms_02.wav: engine peak working allocations 1286584 bytes
+rooms_06.wav: engine peak working allocations 1286584 bytes
+rooms_10.wav: engine peak working allocations 1627024 bytes
+rooms_14.wav: engine peak working allocations 1627024 bytes
+rooms_18.wav: engine peak working allocations 1627024 bytes
+peak RSS 26680 KiB; engine allocations 399 calls, 0 bytes outstanding after free; 0 failure(s)
+model ./models/nemo8.tnm: 13982621 bytes, read 175.8 ms, load 10.3 ms, weights 13894264 bytes, engine allocations 365468 bytes
+edge_cut_319.wav: engine peak working allocations 0 bytes
+edge_noise_3s.wav: engine peak working allocations 917920 bytes
+real_22.wav: engine peak working allocations 1177512 bytes
+real_26.wav: engine peak working allocations 998472 bytes
+rooms_03.wav: engine peak working allocations 1286584 bytes
+rooms_07.wav: engine peak working allocations 1286584 bytes
+rooms_11.wav: engine peak working allocations 1627024 bytes
+rooms_15.wav: engine peak working allocations 1627024 bytes
+rooms_19.wav: engine peak working allocations 1627024 bytes
+peak RSS 26600 KiB; engine allocations 357 calls, 0 bytes outstanding after free; 0 failure(s)
+model ./models/nemo8.tnm: 13982621 bytes, read 193.1 ms, load 10.7 ms, weights 13894264 bytes, engine allocations 365468 bytes
+edge_cut_320.wav: engine peak working allocations 641160 bytes
+edge_silence_3s.wav: engine peak working allocations 917920 bytes
+real_23.wav: engine peak working allocations 984656 bytes
+rooms_00.wav: engine peak working allocations 1286584 bytes
+rooms_04.wav: engine peak working allocations 1286584 bytes
+rooms_08.wav: engine peak working allocations 1286584 bytes
+rooms_12.wav: engine peak working allocations 1627024 bytes
+rooms_16.wav: engine peak working allocations 1627024 bytes
+peak RSS 26672 KiB; engine allocations 357 calls, 0 bytes outstanding after free; 0 failure(s)
+model ./models/nemo8.tnm: 13982621 bytes, read 14.7 ms, load 4.7 ms, weights 13894264 bytes, engine allocations 365468 bytes
+./build/fixtures/long_concat.wav: 723340 bytes exceeds limit 644096
+peak RSS 23692 KiB; engine allocations 21 calls, 0 bytes outstanding after free; 1 failure(s)

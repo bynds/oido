@@ -1,0 +1,51 @@
+file	text	frames	max_abs	max_rel	argmax_diff_frames	first_diff(frame,idx)
+edge_cut_100.wav	same	same	0	0	0	-
+edge_cut_16000.wav	same	same	3.81e-06	1.52e-05	0	7,0
+edge_cut_319.wav	same	same	0	0	0	-
+edge_cut_320.wav	same	same	0	0	0	-
+edge_cut_321.wav	same	same	0	0	0	-
+edge_cut_641.wav	same	same	0	0	0	-
+edge_noise_3s.wav	same	same	1.04	476	0	0,0
+edge_silence_3s.wav	same	same	0	0	0	-
+real_20.wav	DIFF	same	2.6	302	1	0,0
+  ref:  no such authority was given for the course of peel whose registries remained closed
+  test: no such authority was given for the course of peal whose registries remained closed
+real_21.wav	same	same	23.1	3.13e+03	2	0,0
+real_22.wav	same	same	1.31	3.35e+03	0	0,0
+real_23.wav	same	same	12.3	5.21e+03	3	0,0
+real_24.wav	same	same	1.07	3.67e+03	1	0,0
+real_25.wav	DIFF	same	1.28	419	2	0,0
+  ref:  so that indicates that t and menu under that menu
+  test: so that indicates a t menu under that menu
+real_26.wav	same	same	11.2	3.71e+03	2	0,0
+rooms_00.wav	same	same	11	3.31e+03	2	0,0
+rooms_01.wav	same	same	12.5	6.2e+03	2	0,0
+rooms_02.wav	same	same	18	4.84e+03	4	0,0
+rooms_03.wav	same	same	2.3	6e+03	0	0,0
+rooms_04.wav	same	same	1.72	1.54e+03	0	0,0
+rooms_05.wav	same	same	3.4	2.03e+03	0	0,0
+rooms_06.wav	DIFF	same	9.14	1.2e+05	7	0,0
+  ref:  don't you is such a notle ambition between that it is a pity it has such a shallow doination by italian
+  test: don't you is such a nole ambition between that it is a pity it has such a shallow dodination ofian
+rooms_07.wav	same	same	10.4	2.12e+04	3	0,0
+rooms_08.wav	DIFF	same	1.35	1.9e+03	1	0,0
+  ref:  it is such an no ambition that it is a pity it has usually such a shallow foundation
+  test: it is such an nombition that it is a pity it has usually such a shallow foundation
+rooms_09.wav	same	same	5.99	811	0	0,0
+rooms_10.wav	same	same	11.2	4.51e+03	4	0,0
+rooms_11.wav	same	same	12.4	1.37e+03	4	0,0
+rooms_12.wav	same	same	8.04	4.4e+05	4	0,0
+rooms_13.wav	same	same	16.7	8.98e+04	5	0,0
+rooms_14.wav	same	same	5.18	889	0	0,0
+rooms_15.wav	DIFF	same	12.1	2.41e+03	4	0,0
+  ref:  in actual fact there are doubtless various factors that concur in giving us to feeling a greater or less remoteness in some member defs
+  test: in actual fact there are doubtless various factors that concur in giving us to feeling a greater or less remoteness and some member defs
+rooms_16.wav	DIFF	same	8.79	2.78e+03	4	0,0
+  ref:  in actual fact there are doubtless various factors that concur by giving a spars or greater or less remote and some like
+  test: in actual fact there are doubtless various factors that concur by giving a sps or greater or less remote and some like
+rooms_17.wav	same	same	8.73	2.78e+03	2	0,0
+rooms_18.wav	DIFF	same	4.06	2.14e+03	2	0,0
+  ref:  in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some re remembermbed event
+  test: in actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembermbered event
+rooms_19.wav	same	same	5.62	2.21e+03	1	0,0
+35 files, 7 transcript/frame/length mismatch(es)

@@ -1,0 +1,122 @@
+ELF Header:
+  Magic:   7f 45 4c 46 01 01 01 00 00 00 00 00 00 00 00 00 
+  Class:                             ELF32
+  Data:                              2's complement, little endian
+  Version:                           1 (current)
+  OS/ABI:                            UNIX - System V
+  ABI Version:                       0
+  Type:                              DYN (Position-Independent Executable file)
+  Machine:                           ARM
+  Version:                           0x1
+  Entry point address:               0x14e9
+  Start of program headers:          52 (bytes into file)
+  Start of section headers:          73204 (bytes into file)
+  Flags:                             0x5000400, Version5 EABI, hard-float ABI
+  Size of this header:               52 (bytes)
+  Size of program headers:           32 (bytes)
+  Number of program headers:         9
+  Size of section headers:           40 (bytes)
+  Number of section headers:         29
+  Section header string table index: 28
+
+Program Headers:
+  Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
+  EXIDX          0x00e3c4 0x0000e3c4 0x0000e3c4 0x00008 0x00008 R   0x4
+  PHDR           0x000034 0x00000034 0x00000034 0x00120 0x00120 R   0x4
+  INTERP         0x000154 0x00000154 0x00000154 0x00019 0x00019 R   0x1
+      [Requesting program interpreter: /lib/ld-linux-armhf.so.3]
+  LOAD           0x000000 0x00000000 0x00000000 0x0e3d0 0x0e3d0 R E 0x1000
+  LOAD           0x00ee04 0x0000fe04 0x0000fe04 0x00210 0x0ba38 RW  0x1000
+  DYNAMIC        0x00ee0c 0x0000fe0c 0x0000fe0c 0x00108 0x00108 RW  0x4
+  NOTE           0x000170 0x00000170 0x00000170 0x00044 0x00044 R   0x4
+  GNU_STACK      0x000000 0x00000000 0x00000000 0x00000 0x00000 RW  0x10
+  GNU_RELRO      0x00ee04 0x0000fe04 0x0000fe04 0x001fc 0x001fc R   0x1
+
+ Section to Segment mapping:
+  Segment Sections...
+   00     .ARM.exidx 
+   01     
+   02     .interp 
+   03     .interp .note.gnu.build-id .note.ABI-tag .gnu.hash .dynsym .dynstr .gnu.version .gnu.version_r .rel.dyn .rel.plt .init .plt .text .fini .rodata .ARM.exidx .eh_frame 
+   04     .init_array .fini_array .dynamic .got .data .bss 
+   05     .dynamic 
+   06     .note.gnu.build-id .note.ABI-tag 
+   07     
+   08     .init_array .fini_array .dynamic .got 
+
+Dynamic section at offset 0xee0c contains 29 entries:
+  Tag        Type                         Name/Value
+ 0x00000001 (NEEDED)                     Shared library: [libm.so.6]
+ 0x00000001 (NEEDED)                     Shared library: [libc.so.6]
+ 0x00000001 (NEEDED)                     Shared library: [ld-linux-armhf.so.3]
+ 0x0000000c (INIT)                       0x9c8
+ 0x0000000d (FINI)                       0xde1c
+ 0x00000019 (INIT_ARRAY)                 0xfe04
+ 0x0000001b (INIT_ARRAYSZ)               4 (bytes)
+ 0x0000001a (FINI_ARRAY)                 0xfe08
+ 0x0000001c (FINI_ARRAYSZ)               4 (bytes)
+ 0x6ffffef5 (GNU_HASH)                   0x1b4
+ 0x00000005 (STRTAB)                     0x4fc
+ 0x00000006 (SYMTAB)                     0x1cc
+ 0x0000000a (STRSZ)                      517 (bytes)
+ 0x0000000b (SYMENT)                     16 (bytes)
+ 0x00000015 (DEBUG)                      0x0
+ 0x00000003 (PLTGOT)                     0xff14
+ 0x00000002 (PLTRELSZ)                   344 (bytes)
+ 0x00000014 (PLTREL)                     REL
+ 0x00000017 (JMPREL)                     0x870
+ 0x00000011 (REL)                        0x7d8
+ 0x00000012 (RELSZ)                      152 (bytes)
+ 0x00000013 (RELENT)                     8 (bytes)
+ 0x0000001e (FLAGS)                      BIND_NOW
+ 0x6ffffffb (FLAGS_1)                    Flags: NOW PIE
+ 0x6ffffffe (VERNEED)                    0x768
+ 0x6fffffff (VERNEEDNUM)                 3
+ 0x6ffffff0 (VERSYM)                     0x702
+ 0x6ffffffa (RELCOUNT)                   12
+ 0x00000000 (NULL)                       0x0
+
+Version symbols section '.gnu.version' contains 51 entries:
+ Addr: 0x0000000000000702  Offset: 0x00000702  Link: 5 (.dynsym)
+  000:   0 (*local*)       0 (*local*)       0 (*local*)       2 (GLIBC_2.4)  
+  004:   2 (GLIBC_2.4)     2 (GLIBC_2.4)     1 (*global*)      2 (GLIBC_2.4)  
+  008:   2 (GLIBC_2.4)     2 (GLIBC_2.4)     3 (GLIBC_2.4)     4 (GLIBC_2.17) 
+  00c:   2 (GLIBC_2.4)     2 (GLIBC_2.4)     2 (GLIBC_2.4)     5 (GLIBC_2.4)  
+  010:   2 (GLIBC_2.4)     2 (GLIBC_2.4)     2 (GLIBC_2.4)     2 (GLIBC_2.4)  
+  014:   5 (GLIBC_2.4)     2 (GLIBC_2.4)     5 (GLIBC_2.4)     2 (GLIBC_2.4)  
+  018:   2 (GLIBC_2.4)     2 (GLIBC_2.4)     1 (*global*)      5 (GLIBC_2.4)  
+  01c:   2 (GLIBC_2.4)     2 (GLIBC_2.4)     5 (GLIBC_2.4)     2 (GLIBC_2.4)  
+  020:   2 (GLIBC_2.4)     5 (GLIBC_2.4)     2 (GLIBC_2.4)     2 (GLIBC_2.4)  
+  024:   2 (GLIBC_2.4)     2 (GLIBC_2.4)     2 (GLIBC_2.4)     5 (GLIBC_2.4)  
+  028:   2 (GLIBC_2.4)     5 (GLIBC_2.4)     2 (GLIBC_2.4)     2 (GLIBC_2.4)  
+  02c:   5 (GLIBC_2.4)     5 (GLIBC_2.4)     1 (*global*)      2 (GLIBC_2.4)  
+  030:   2 (GLIBC_2.4)     2 (GLIBC_2.4)     5 (GLIBC_2.4)  
+
+Version needs section '.gnu.version_r' contains 3 entries:
+ Addr: 0x0000000000000768  Offset: 0x00000768  Link: 6 (.dynstr)
+  000000: Version: 1  File: libm.so.6  Cnt: 1
+  0x0010:   Name: GLIBC_2.4  Flags: none  Version: 5
+  0x0020: Version: 1  File: ld-linux-armhf.so.3  Cnt: 1
+  0x0030:   Name: GLIBC_2.4  Flags: none  Version: 3
+  0x0040: Version: 1  File: libc.so.6  Cnt: 2
+  0x0050:   Name: GLIBC_2.17  Flags: none  Version: 4
+  0x0060:   Name: GLIBC_2.4  Flags: none  Version: 2
+Attribute Section: aeabi
+File Attributes
+  Tag_CPU_name: "7-A"
+  Tag_CPU_arch: v7
+  Tag_CPU_arch_profile: Application
+  Tag_ARM_ISA_use: Yes
+  Tag_THUMB_ISA_use: Thumb-2
+  Tag_FP_arch: VFPv3
+  Tag_Advanced_SIMD_arch: NEONv1
+  Tag_ABI_PCS_wchar_t: 4
+  Tag_ABI_FP_rounding: Needed
+  Tag_ABI_FP_denormal: Needed
+  Tag_ABI_FP_exceptions: Needed
+  Tag_ABI_FP_number_model: IEEE 754
+  Tag_ABI_align_needed: 8-byte
+  Tag_ABI_align_preserved: 8-byte, except leaf SP
+  Tag_ABI_enum_size: int
+  Tag_ABI_VFP_args: VFP registers
+  Tag_CPU_unaligned_access: v6
