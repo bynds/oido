@@ -32,12 +32,18 @@ static uint64_t now_ns(clockid_t id)
 }
 
 // ---- allocation accounting. Keeps the default allocator's contract: zeroed, 16-byte aligned.
+// tasr_nemo_load and tasr_nemo_stream_new handle a failed allocation; tasr_nemo_transcribe does not check its
+// working buffers, so while it runs a failure ends the process with a message instead of writing through NULL.
 static size_t alloc_cur, alloc_peak, alloc_count;
+static int alloc_fatal;
 static void *counting_alloc(size_t n, int kind)
 {
     (void)kind;
     void *p = NULL;
-    if (n > SIZE_MAX - 16 || posix_memalign(&p, 16, n + 16)) return NULL;
+    if (n > SIZE_MAX - 16 || posix_memalign(&p, 16, n + 16)) {
+        if (alloc_fatal) { fprintf(stderr, "fatal: engine allocation of %zu bytes failed during inference\n", n); abort(); }
+        return NULL;
+    }
     memset(p, 0, n + 16);
     memcpy(p, &n, sizeof(n));
     alloc_cur += n;
@@ -175,7 +181,9 @@ int main(int argc, char **argv)
         text[0] = 0;
         alloc_peak = alloc_cur;
         const uint64_t c0 = now_ns(CLOCK_PROCESS_CPUTIME_ID), t0 = now_ns(CLOCK_MONOTONIC);
+        alloc_fatal = 1;
         const int frames = tasr_nemo_transcribe(nm, pcm, ns, NULL, text, TEXT_MAX, logits, max_frames, &nf);
+        alloc_fatal = 0;
         const uint64_t t1 = now_ns(CLOCK_MONOTONIC), c1 = now_ns(CLOCK_PROCESS_CPUTIME_ID);
         const double audio_s = ns / 16000.0, wall = (t1 - t0) / 1e9, cpu = (c1 - c0) / 1e9;
         // The engine silently drops a token that would not fit, so treat a nearly full buffer as possibly truncated.

@@ -1,5 +1,7 @@
 // tasr_nemo: utterance-level engine for NVIDIA NeMo Conformer-CTC small (rel-pos MHSA, full context), int8.
 // Mirrors train/nemo_small.py + train/nemo_eval.py (--bits 8 --att8) arithmetic.
+// Modified 2026-10-08 for the Jibo port (ports/jibo): loader header/bounds/alignment/size validation, allocation
+// checks in load and stream creation, NaN-safe lookup indices, stream truncation flag. Arithmetic is unchanged.
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -73,13 +75,24 @@ typedef struct {
     const uint8_t *p, *end;
     int err;
 } ncur_t;
-static void nalign(ncur_t *c) { c->p = (const uint8_t *)(((uintptr_t)c->p + 15) & ~(uintptr_t)15); }
+static void nalign(ncur_t *c)
+{
+    const size_t pad = (size_t)(-(uintptr_t)c->p & 15);
+    if (c->err || pad > (size_t)(c->end - c->p)) { c->err = 1; return; }
+    c->p += pad;
+}
+// take n bytes (after alignment if align); NULL, with err set, if they are not all inside the blob
+static const uint8_t *ntake(ncur_t *c, size_t n, int align)
+{
+    if (align) nalign(c);
+    if (c->err || n > (size_t)(c->end - c->p)) { c->err = 1; return NULL; }
+    const uint8_t *r = c->p;
+    c->p += n;
+    return r;
+}
 static const float *nf32(ncur_t *c, size_t n, size_t *acc)
 {
-    nalign(c);
-    const float *r = (const float *)c->p;
-    c->p += n * 4;
-    if (c->p > c->end) c->err = 1;
+    const float *r = n > SIZE_MAX / 4 ? (c->err = 1, NULL) : (const float *)ntake(c, n * 4, 1);
     if (acc) *acc += n * 4;
     return r;
 }
@@ -91,10 +104,8 @@ static tasr_qlin_t nload_qlin(ncur_t *c, int n, int k, int bits, size_t *acc)
     int blk = (bits == 8 || L.blocked) ? 16 : 32;
     L.n = n; L.k = k; L.bits = bits;
     L.kp = (k + blk - 1) / blk * blk;
-    nalign(c);
-    L.w = (const int8_t *)c->p;
     size_t wb = (size_t)n * (bits == 8 ? L.kp : L.kp / 2);
-    c->p += wb;
+    L.w = (const int8_t *)ntake(c, wb, 1);
     *acc += wb;
     L.s = nf32(c, n, acc);
     L.b = nf32(c, n, acc);
@@ -108,12 +119,30 @@ static nln_t nln(ncur_t *c, int d, size_t *acc)
     return l;
 }
 
+// Header ranges the engine is written for (fixed-size scratch: head dim <= 64; sinusoidal positions need an even
+// width). Every model file shipped so far: version 1, d 176, 4 heads, ff 704, kernel 31, 16 layers, 176 channels,
+// vocabulary 1024. Anything outside is refused before any pointer into the blob is formed, and the load fails unless
+// the layout the header describes ends exactly at the end of the blob (size must be the model file's size).
+static int nheader_ok(const uint32_t *hd)
+{
+    if (hd[0] != 1) return 0;
+    const uint32_t d = hd[1], h = hd[2], ff = hd[3], k = hd[4], nl = hd[5], sc = hd[6], V = hd[7], bits = hd[8];
+    if (d < 2 || d > 1024 || d % 2 || h < 1 || h > 16 || d % h || d / h > 64) return 0;
+    if (ff < 1 || ff > 8192 || k < 1 || k > 63 || !(k & 1) || nl < 1 || nl > 64 || sc < 1 || sc > 1024) return 0;
+    if (V < 1 || V > 8192 || (bits != 4 && bits != 8) || hd[9] > 1) return 0;
+    if (hd[10] & ~3u || hd[11] > 4096 || hd[12] > 4096) return 0;
+    return 1;
+}
+
 tasr_nemo_t *tasr_nemo_load(const uint8_t *blob, size_t size)
 {
-    if (size < 64 || memcmp(blob, "TNM1", 4)) return NULL;
+    // weights are laid out at 16-byte offsets from an aligned blob: a misaligned blob would be read wrongly
+    if (!blob || size < 64 || ((uintptr_t)blob & 15) || memcmp(blob, "TNM1", 4)) return NULL;
     uint32_t hd[15];
     memcpy(hd, blob + 4, sizeof(hd));
+    if (!nheader_ok(hd)) return NULL;
     tasr_nemo_t *m = (tasr_nemo_t *)tasr_alloc(sizeof(tasr_nemo_t), 1);
+    if (!m) return NULL;
     m->d = hd[1]; m->h = hd[2]; m->ff = hd[3]; m->k = hd[4]; m->nl = hd[5]; m->sc = hd[6]; m->V = hd[7];
     const int bits = hd[8];
     m->flags = hd[10]; m->s_chunk = hd[11]; m->s_left = hd[12];
@@ -126,6 +155,7 @@ tasr_nemo_t *tasr_nemo_load(const uint8_t *blob, size_t size)
     const int d = m->d;
     m->window = nf32(&c, WIN, &acc);
     const float *fb = nf32(&c, NBIN * NMEL, NULL);
+    if (c.err) goto fail;
     int tot = 0;
     for (int j = 0; j < NMEL; j++) {
         int s = -1, e = -1;
@@ -136,6 +166,7 @@ tasr_nemo_t *tasr_nemo_load(const uint8_t *blob, size_t size)
         tot += m->mel_len[j];
     }
     m->mel_w = (float *)tasr_alloc(sizeof(float) * (tot + 1), 1);
+    if (!m->mel_w) goto fail;
     for (int j = 0, o = 0; j < NMEL; j++)
         for (int b = 0; b < m->mel_len[j]; b++) m->mel_w[o++] = fb[(m->mel_start[j] + b) * NMEL + j];
     m->c0_w = nf32(&c, m->sc * 9, &acc);
@@ -143,6 +174,7 @@ tasr_nemo_t *tasr_nemo_load(const uint8_t *blob, size_t size)
     m->c2 = nload_qlin(&c, m->sc, m->sc * 9, 8, &acc);
     m->sub = nload_qlin(&c, d, m->sc * m->f2, 8, &acc);
     m->L = (nlayer_t *)tasr_alloc(sizeof(nlayer_t) * m->nl, 1);
+    if (!m->L) goto fail;
     for (int i = 0; i < m->nl; i++) {
         nlayer_t *L = &m->L[i];
         L->n_ff1 = nln(&c, d, &acc);
@@ -163,7 +195,9 @@ tasr_nemo_t *tasr_nemo_load(const uint8_t *blob, size_t size)
         L->ff2_1 = nload_qlin(&c, m->ff, d, bits, &acc);
         L->ff2_2 = nload_qlin(&c, d, m->ff, bits, &acc);
         L->n_out = nln(&c, d, &acc);
+        if (c.err) goto fail;
         float *wt = (float *)tasr_alloc(sizeof(float) * m->k * d, 0);
+        if (!wt) goto fail;
         for (int ch = 0; ch < d; ch++)
             for (int j = 0; j < m->k; j++) wt[j * d + ch] = L->dw_w[ch * m->k + j];
         L->dw_wt = wt;
@@ -183,16 +217,19 @@ tasr_nemo_t *tasr_nemo_load(const uint8_t *blob, size_t size)
     nalign(&c);
     m->tok = (const char **)tasr_alloc(sizeof(char *) * m->V, 1);
     m->tok_len = (uint8_t *)tasr_alloc(m->V, 1);
-    for (int i = 0; i < m->V; i++) {
-        m->tok_len[i] = *c.p++;
-        m->tok[i] = (const char *)c.p;
-        c.p += m->tok_len[i];
+    if (!m->tok || !m->tok_len) goto fail;
+    for (int i = 0; i < m->V && !c.err; i++) {
+        const uint8_t *n = ntake(&c, 1, 0);
+        if (!n) break;
+        m->tok_len[i] = *n;
+        m->tok[i] = (const char *)ntake(&c, *n, 0);
     }
     if (m->flags & 1) {  // fixed normalization stats appended after the tokens
         m->nmean = nf32(&c, NMEL, NULL);
         m->nstd = nf32(&c, NMEL, NULL);
     }
-    if (c.err || c.p > c.end) { tasr_nemo_free(m); return NULL; }
+    // every dimension shapes the layout, so a header that does not describe this file consumes a different length
+    if (c.err || c.p != c.end) goto fail;
     m->blob_bytes = (size_t)(c.p - blob);
     m->weight_bytes = acc;
     for (int i = 0; i < 256; i++) {
@@ -205,6 +242,9 @@ tasr_nemo_t *tasr_nemo_load(const uint8_t *blob, size_t size)
         m->bitrev[i] = (int16_t)r;
     }
     return m;
+fail:
+    tasr_nemo_free(m);
+    return NULL;
 }
 
 void tasr_nemo_free(tasr_nemo_t *m)
@@ -271,7 +311,7 @@ static void nsig_init(void)
 static inline float nsig(float x)
 {
     float u = (x + 12.0f) * 16.0f;
-    if (u <= 0.f) return 0.f;
+    if (!(u > 0.f)) return 0.f;  // also NaN (from a corrupt model), which would otherwise index out of the table
     if (u >= 384.f) return 1.f;
     int i = (int)u;
     return nsig_tab[i] + (u - (float)i) * nsig_slope[i];
@@ -402,7 +442,7 @@ static void natt_job(void *p, int b, int e, int w)
             const float mx64 = mx * NEXP_STEPS + 0.5f;
             for (int j = 0; j < T; j++) {
                 const int ix = (int)(mx64 - sc[j] * NEXP_STEPS);  // >= 0: round((mx - s) * 64)
-                const float ex = ix < NEXP_N ? nexp_tab[ix] : 0.f;
+                const float ex = (unsigned)ix < NEXP_N ? nexp_tab[ix] : 0.f;  // ix < 0 only for non-finite scores
                 sum += ex;
                 float p2 = ex * sv[j];
                 sc[j] = p2;
@@ -1177,7 +1217,7 @@ struct tasr_nemo_stream {
     // decoding
     tasr_decoder_t *dec;
     float *lg, *lp;
-    int prev, len, frames;
+    int prev, len, frames, truncated;
     float *sink;
     int sink_max;
     char text[2048];
@@ -1266,7 +1306,7 @@ static void satt_job(void *p, int b, int e, int w)
             const float mx64 = mx * NEXP_STEPS + 0.5f;
             for (int k = 0; k < nkeys; k++) {
                 const int ix = (int)(mx64 - sc[k] * NEXP_STEPS);
-                const float ex = ix < NEXP_N ? nexp_tab[ix] : 0.f;
+                const float ex = (unsigned)ix < NEXP_N ? nexp_tab[ix] : 0.f;  // ix < 0 only for non-finite scores
                 sum += ex;
                 const float p2 = ex * sv[k];
                 sc[k] = p2;
@@ -1308,6 +1348,7 @@ static void s_emit(struct tasr_nemo_stream *s, const float *l)
     } else if (best != s->prev && best != m->V) {
         const int nl = m->tok_len[best];
         if (s->len + nl + 1 < (int)sizeof(s->text)) { memcpy(s->text + s->len, m->tok[best], nl); s->len += nl; s->text[s->len] = 0; }
+        else s->truncated = 1;
     }
     s->prev = best;
     s->frames++;
@@ -1597,10 +1638,19 @@ tasr_nemo_stream_t *tasr_nemo_stream_new(const tasr_nemo_t *m, int chunk, int le
     }
     s->lg = (float *)tasr_alloc(sizeof(float) * s->C * (m->V + 1), 0);
     s->lp = (float *)tasr_alloc(sizeof(float) * (m->V + 1), 0);
-    if (!s->p8 || !s->k8 || !s->vt || !s->gh || !s->h2 || !s->lg || !s->W.xq) { tasr_nemo_stream_free(s); return NULL; }
+    {
+        const void *need[] = {s->p8, s->sp, s->k8, s->sk, s->vt, s->sv, s->gh, s->mel, s->c0ring, s->cmaxr, s->cmw, s->col,
+                              s->c2out, s->fr, s->xq_sub, s->xs_sub, s->x, s->W.xq, s->W.xs, s->hb, s->h2, s->att, s->prow,
+                              s->qu, s->qv, s->squ, s->sqv, s->lg, s->lp};
+        int ok = 1;
+        for (size_t i = 0; i < sizeof(need) / sizeof(need[0]); i++) ok &= need[i] != NULL;
+        for (int w = 0; w < NW; w++) ok &= s->W.wtmp[w] && s->W.acc[w] && s->scb[w] && s->pq[w] && s->ia[w];
+        if (!ok) { tasr_nemo_stream_free(s); return NULL; }
+    }
     // positional rows for offsets OMAX..-(C-1), int8 once, then every layer's linear_pos per head
     const int kpp = m->L[0].pos.kp;
     float *pe = (float *)tasr_alloc(sizeof(float) * RB * d, 0);
+    if (!pe) { tasr_nemo_stream_free(s); return NULL; }
     for (int r0 = 0; r0 < s->NP; r0 += RB) {
         const int rn = s->NP - r0 < RB ? s->NP - r0 : RB;
         for (int r = 0; r < rn; r++) {
@@ -1636,7 +1686,7 @@ void tasr_nemo_stream_reset(tasr_nemo_stream_t *s)
     s->mel_t = s->c0_next = s->t2_next = s->finished = 0;
     s->T0 = s->T1 = s->T = 0;
     s->nbat = s->nflat = s->t_chunk = s->kbase = s->nk = 0;
-    s->prev = -1; s->len = 0; s->frames = 0; s->text[0] = 0;
+    s->prev = -1; s->len = 0; s->frames = 0; s->truncated = 0; s->text[0] = 0;
     memset(s->gh, 0, sizeof(float) * m->nl * (2 * s->halo + s->C) * m->d);
     memset(s->vt, 0, (size_t)m->nl * m->h * m->dh * s->Lcp);
     if (s->dec) tasr_decoder_reset(s->dec);
@@ -1669,6 +1719,7 @@ static void s_text(tasr_nemo_stream_t *s, char *text, int maxlen)
         }
     } else {
         len = s->len < maxlen - 1 ? s->len : maxlen - 1;
+        if (len < s->len) s->truncated = 1;
         memcpy(text, s->text, len);
         text[len] = 0;
     }
@@ -1724,3 +1775,4 @@ void tasr_nemo_stream_set_sink(tasr_nemo_stream_t *s, float *logits, int max_fra
     s->sink_max = max_frames;
 }
 int tasr_nemo_stream_supported(const tasr_nemo_t *m) { return m && m->nmean && !m->rnnt; }
+int tasr_nemo_stream_truncated(const tasr_nemo_stream_t *s) { return s->truncated; }

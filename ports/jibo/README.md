@@ -1,10 +1,12 @@
 # Oído on the original Jibo: port status
 
 Native, local English transcription on Jibo's existing firmware (Tegra K1, 32-bit ARMv7 hard float, glibc 2.21),
-with Oído's own engine and models. This directory is new; nothing under `esp32/`, `models/` or `train/` is changed.
+with Oído's own engine and models. Port code lives here; the only upstream source changed is the NeMo engine's
+loader/robustness code (`esp32/components/tinyasr/tasr_nemo.{c,h}`, see [Engine changes](#engine-changes)), which
+leaves every model output bit-identical.
 
-**Status (8 October 2026): milestone 1 (baseline, build, ABI) done on the host and in an ARM emulator. Not yet run
-on a Jibo.** Every result below names where it ran. No result here comes from a robot.
+**Status (8 October 2026): milestones 1 (baseline, build, ABI) and 2 (validation, lifecycle) done on the host and
+in an ARM emulator. Not yet run on a Jibo.** Every result below names where it ran. No result here comes from a robot.
 
 | Environment | State |
 |---|---|
@@ -13,6 +15,7 @@ on a Jibo.** Every result below names where it ran. No result here comes from a 
 | ARMv7 scalar under qemu-arm | bit-identical logits to host on 35/35 fixtures with the same libm (glibc 2.39); with Jibo's glibc 2.21 libm, 28/35 transcripts identical, all differences traced to 1-ulp `logf` results |
 | Owner's `jibo-armcc` (Linaro GCC 4.8.4) | **not built**: the wrapper is not in this environment |
 | Physical Jibo CPU | **pending**: no robot access from here (`scripts/robot-run.sh` is ready for the owner) |
+| Model validation and allocation failures (milestone 2) | done; `tests/run-tests.sh` under ASan/UBSan |
 | NEON, streaming, live audio, LM, GPU | not started (milestones 3–7) |
 
 ## Layout
@@ -24,6 +27,8 @@ ports/jibo/
   check-jibo-abi.sh       ELF/ABI gate, copied from the Decider port (provenance in its header)
   oido_cli.c              bounded WAV front end: wall + CPU time, allocation accounting, logit dump, strict exit
   tests/libm_fingerprint.c  hashes of logf/expf results: tells which libm (and so which reference) applies
+  tests/test_model_load.c   loader/stream constructor vs truncation, bad headers, misalignment, failing allocations
+  tests/run-tests.sh        builds and runs the host tests under ASan/UBSan
   scripts/
     model-manifest.sh     model sizes, SHA-256, TNM1 header fields -> manifests/models.tsv
     make-fixtures.sh      fixture pack -> build/fixtures, hashes -> manifests/
@@ -103,8 +108,39 @@ with `clock()` (CPU only), accepts truncated WAV data, and has no memory figures
 - flags a transcript within 256 bytes of its 16 KiB buffer as possibly truncated, since the engine drops a token
   that does not fit without saying so.
 
-It does not yet validate the model file beyond its magic number: `tasr_nemo_load` trusts header dimensions and
-lengths (milestone 2). Use only the pinned models.
+The model file is validated by the engine's loader (next section). During an inference, a failed engine allocation
+ends the process with a message (`abort`), because `tasr_nemo_transcribe` does not check its working buffers.
+
+## Engine changes
+
+`tasr_nemo.c` and `tasr_nemo.h` carry dated modification notices. The changes, none of which touches arithmetic (the
+host run after them is bit-identical to the run before on all 35 fixtures):
+
+- **Header ranges** checked before anything else: version 1; d even, 2–1024, divisible by heads (1–16) with head
+  dimension at most 64 (fixed scratch arrays); ff 1–8192; odd kernel 1–63; 1–64 layers; 1–1024 channels;
+  vocabulary 1–8192; 4 or 8 bits; known flag bits; stream chunk/left at most 4096.
+- **Bounds-checked cursor**: no pointer is formed past the blob and no table (filterbank, depthwise weights, token
+  strings) is read before its bytes are known to be present. The original code walked token strings and the
+  filterbank before its single end-of-load check.
+- **Exact size**: the layout the header describes must end exactly at `size`. All four shipped `.tnm` files do, and
+  the ESP32 firmware passes the exact size. This refuses most wrong headers, since every dimension shapes the layout.
+- **16-byte alignment** of the blob is required: weights sit at 16-byte boundaries relative to an aligned base, so a
+  misaligned blob (e.g. from an 8-byte-aligned 32-bit `malloc`) was silently read wrongly.
+- **Allocation failures** in `tasr_nemo_load` and `tasr_nemo_stream_new` free everything and return NULL (the stream
+  constructor previously checked 7 of its 36 allocations, and not the positional-encoding buffer).
+- **NaN-safe table lookups**: a header that passes every check can still mislabel the data (`ff` 703 instead of 704
+  happens to consume the same length), giving non-finite activations. The sigmoid and softmax-exponent lookups then
+  indexed their tables with INT_MIN. They now treat NaN as out of range; finite inputs take the same path as before.
+- **`tasr_nemo_stream_truncated()`**: the stream's fixed 2 KiB greedy text buffer, and a too-small `maxlen`, used to
+  drop text silently.
+
+`tests/test_model_load.c` (via `tests/run-tests.sh`, ASan + UBSan, exact-size allocations so any over-read is
+caught) checks, on every shipped model: it loads, and stream support matches header flag bit 1; ~73,000 truncations
+are refused; each header word set to 0, 1, ±1, 0x7fffffff and 0xffffffff is refused, or loads and then transcribes
+and streams 0.5 s cleanly; a misaligned blob is refused; and the Nth allocation failing, for every N reached (21 in
+load, 41 in stream creation), returns NULL with nothing leaked. Remaining: `tasr_nemo_transcribe`'s own working
+allocations are unchecked (handled by the port's fail-fast allocator, above); the engine is still non-reentrant
+(static tables and profiler state), so callers serialize initialization and inference.
 
 ## Results
 
@@ -162,7 +198,7 @@ streaming**. It is a reference for that mode only; the chunked streaming path is
 2. **Owner's toolchain**: rebuild with `JIBO_CC=<jibo-armcc>` (GCC 4.8.4) and re-run the ABI check and the qemu
    comparison; GCC 4.8 may round or schedule differently from 13.3.
 3. **Model SHA-256 against Hugging Face**: sizes match; hashes and repository revisions unread (network policy).
-4. **Model-file validation and allocation-failure cleanup** in the engine (milestone 2) before serving anything.
+4. Allocation checks inside `tasr_nemo_transcribe` (fail-fast in the port for now); engine reentrancy audit.
 5. **NEON INT8 kernels** with a force-scalar switch and exact-integer tests (milestone 3); profile first.
 6. **Streaming replay** through `tasr_nemo_stream_*` (milestone 4); `tasr_cli` and `oido_cli` only test full
    context, including for `oido_stream.tnm`.

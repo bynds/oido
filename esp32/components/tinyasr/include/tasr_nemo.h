@@ -1,4 +1,5 @@
 // Utterance-level engine for NVIDIA NeMo Conformer-CTC small (13 M params, int8) — higher-accuracy mode.
+// Modified 2026-10-08 for the Jibo port (ports/jibo): load contract documented; tasr_nemo_stream_truncated added.
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
@@ -10,6 +11,9 @@ extern "C" {
 typedef struct tasr_nemo tasr_nemo_t;
 struct tasr_decoder;
 
+// blob: the whole model file, 16-byte aligned, kept alive (weights and token strings are used in place) until
+// tasr_nemo_free; size: exactly the file's size. NULL if the header is outside the supported ranges, the layout it
+// describes does not end exactly at size, the blob is misaligned, or an allocation fails.
 tasr_nemo_t *tasr_nemo_load(const uint8_t *blob, size_t size);
 void tasr_nemo_free(tasr_nemo_t *m);
 size_t tasr_nemo_weight_bytes(const tasr_nemo_t *m);
@@ -35,6 +39,9 @@ int tasr_nemo_stream_finish(tasr_nemo_stream_t *s, char *text, int maxlen);    /
 void tasr_nemo_stream_set_sink(tasr_nemo_stream_t *s, float *logits, int max_frames);  // optional raw logits
 void tasr_nemo_stream_free(tasr_nemo_stream_t *s);
 int tasr_nemo_stream_supported(const tasr_nemo_t *m);
+// nonzero if greedy text was dropped since the last reset: the stream's 2 KiB buffer filled, or a text/finish call's
+// maxlen was too small (the beam decoder path does not report this)
+int tasr_nemo_stream_truncated(const tasr_nemo_stream_t *s);
 
 // profiling (TASR_PROFILE builds): per-stage cycle totals
 const char *tasr_nemo_profile_name(int i);
