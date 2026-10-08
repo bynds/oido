@@ -1,0 +1,8 @@
+label: qemu-armv7-scalar-m3
+binary: build/jibo-scalar/oido_cli (fc67b19899ec93300dcbd29a771140f71fd21862b18e2eddc6a859acdfdb6d3c)
+model: ./models/nemo8.tnm (452e332e21f46f161e383a1f26f36294785b2782cb3252928841dd7e6480c68b)
+runner: qemu-arm -L <scratch>/sysroot-2.21
+jobs: 4
+host: Linux 6.18.44-fc-v80 x86_64; Intel(R) Xeon(R) Processor @ 2.10GHz
+date: 2026-10-08T09:05:37Z
+exit: 0

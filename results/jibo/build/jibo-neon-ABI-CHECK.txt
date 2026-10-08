@@ -1,0 +1,14 @@
+ok   ./build/jibo-neon/oido_cli  (GLIBC_2.17 GLIBC_2.4 )
+     arch v7, fpu VFPv3, simd NEONv1, needs libm.so.6 libc.so.6 ld-linux-armhf.so.3 
+ok   ./build/jibo-neon/oido_stream_replay  (GLIBC_2.17 GLIBC_2.4 )
+     arch v7, fpu VFPv3, simd NEONv1, needs libm.so.6 libc.so.6 ld-linux-armhf.so.3 
+ok   ./build/jibo-neon/oido_service  (GLIBC_2.17 GLIBC_2.4 )
+     arch v7, fpu VFPv3, simd NEONv1, needs libm.so.6 libpthread.so.0 libc.so.6 ld-linux-armhf.so.3 
+ok   ./build/jibo-neon/oido_feed  (GLIBC_2.17 GLIBC_2.4 )
+     arch v7, fpu VFPv3, simd NEONv1, needs libm.so.6 libc.so.6 ld-linux-armhf.so.3 
+ok   ./build/jibo-neon/libm_fingerprint  (GLIBC_2.4 )
+     arch v7, fpu VFPv3, simd NEONv1, needs libm.so.6 libc.so.6 
+ok   ./build/jibo-neon/test_kernels  (GLIBC_2.16 GLIBC_2.4 )
+     arch v7, fpu VFPv3, simd NEONv1, needs libc.so.6 ld-linux-armhf.so.3 
+ok   ./build/jibo-neon/bench_kernels  (GLIBC_2.16 GLIBC_2.17 GLIBC_2.4 )
+     arch v7, fpu VFPv3, simd NEONv1, needs libc.so.6 ld-linux-armhf.so.3 

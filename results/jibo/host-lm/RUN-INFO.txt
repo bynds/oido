@@ -1,0 +1,5 @@
+label: host-lm
+binary: build/host/oido_cli
+model: models/nemo8.tnm + models/nemo_lm.tlm, beam 4, weight 0.3, bonus 0.5
+runner: native
+note: timings taken while sanitizer test runs shared the CPU: not a cost measurement

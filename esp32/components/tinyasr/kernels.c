@@ -1,9 +1,17 @@
 #include "kernels.h"
+// Modified 2026-10-08 for the Jibo port (ports/jibo): optional TASR_KERNEL_DISPATCH renaming of the portable kernels.
 #include <math.h>
 #include <string.h>
 
 #if defined(ESP_PLATFORM) && defined(CONFIG_IDF_TARGET_ESP32S3) && !defined(TASR_NO_SIMD)
 #define TASR_PIE 1
+#endif
+// TASR_KERNEL_DISPATCH (Linux ports): the portable kernels below keep their code but are named *_scalar, and the public
+// names come from a dispatch layer (ports/jibo/kernels_neon.c: NEON, force-scalar switch, shape statistics).
+#if defined(TASR_KERNEL_DISPATCH) && !defined(TASR_PIE)
+#define KSCALAR(f) f##_scalar
+#else
+#define KSCALAR(f) f
 #endif
 
 // round-to-nearest-even via the 1.5*2^23 trick (matches torch.round), valid for |x| < 2^22
@@ -58,7 +66,7 @@ __attribute__((noinline, optimize("no-branch-count-reg"))) void tasr_dot_rows_s8
     }
 }
 #else
-void tasr_dot_rows_s8(const int8_t *w, const int8_t *x, int ldq, int T, int kp, int32_t *out)
+void KSCALAR(tasr_dot_rows_s8)(const int8_t *w, const int8_t *x, int ldq, int T, int kp, int32_t *out)
 {
     for (int t = 0; t < T; t++) {
         const int8_t *a = x + (size_t)t * ldq;
@@ -311,7 +319,7 @@ __attribute__((noinline, optimize("no-branch-count-reg"))) void tasr_gemm_blk16(
     }
 }
 #else
-void tasr_gemm_blk16(const int8_t *tile, int kp, const int8_t *x, int ldq, int T, int32_t *out)
+void KSCALAR(tasr_gemm_blk16)(const int8_t *tile, int kp, const int8_t *x, int ldq, int T, int32_t *out)
 {
     for (int t = 0; t < T; t++) {
         const int8_t *px = x + (size_t)t * ldq;
@@ -355,7 +363,7 @@ __attribute__((noinline, optimize("no-branch-count-reg"))) void tasr_dot48_rows(
     }
 }
 #else
-void tasr_dot48_rows(const int8_t *q, const int8_t *x, int ldx, int T, int32_t *out)
+void KSCALAR(tasr_dot48_rows)(const int8_t *q, const int8_t *x, int ldx, int T, int32_t *out)
 {
     for (int t = 0; t < T; t++) {
         const int8_t *a = x + (size_t)t * ldx;
@@ -529,7 +537,7 @@ __attribute__((noinline, optimize("no-branch-count-reg"))) void tasr_gemm_s8_xr(
     }
 }
 #else
-void tasr_gemm_s8_xr(const int8_t *W, int kp, int nb, const int8_t *x, int ldq, int T, int32_t *acc)
+void KSCALAR(tasr_gemm_s8_xr)(const int8_t *W, int kp, int nb, const int8_t *x, int ldq, int T, int32_t *acc)
 {
     for (int t = 0; t < T; t++)
         for (int j = 0; j < nb; j++) {

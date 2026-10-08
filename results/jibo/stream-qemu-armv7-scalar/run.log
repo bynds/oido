@@ -1,0 +1,6 @@
+kernels: scalar (no dispatch layer)
+stream: chunk 0, left 0 (0 = model default); created in 667.9 ms, 3271764 bytes of state
+peak RSS 31476 KiB; 0 bytes outstanding after free; 0 failure(s)
+kernels: scalar (no dispatch layer)
+stream: chunk 0, left 0 (0 = model default); created in 871.6 ms, 3271764 bytes of state
+peak RSS 31528 KiB; 0 bytes outstanding after free; 0 failure(s)

@@ -1,0 +1,8 @@
+label: qemu-armv7-neon
+binary: build/jibo-neon/oido_cli (877f1119ef4398b1a0d6a9c9665fdc34212403d55bcdac5ff3ac21e5d165d704)
+model: ./models/nemo8.tnm (452e332e21f46f161e383a1f26f36294785b2782cb3252928841dd7e6480c68b)
+runner: qemu-arm -L <scratch>/sysroot-2.21
+jobs: 4
+host: Linux 6.18.44-fc-v80 x86_64; Intel(R) Xeon(R) Processor @ 2.10GHz
+date: 2026-10-08T08:59:34Z
+exit: 0

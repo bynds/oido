@@ -1,0 +1,176 @@
+file	schedule	samples	frames	partials	first_partial_audio_s	chunks	chunk_p50_ms	chunk_p95_ms	chunk_p99_ms	chunk_max_ms	finish_ms	compute_ms	cpu_ms	wall_rtf	backlog_max_ms	end_to_final_ms	truncated	text
+edge_cut_100.wav	320	100	0	0	-1.00	0	0.00	0.00	0.00	0.00	0.00	0.0	0.0	0.0008	0.0	0.0	0	
+edge_cut_100.wav	160	100	0	0	-1.00	0	0.00	0.00	0.00	0.00	0.00	0.0	0.0	0.0000	0.0	0.0	0	
+edge_cut_100.wav	1600	100	0	0	-1.00	0	0.00	0.00	0.00	0.00	0.00	0.0	0.0	0.0000	0.0	0.0	0	
+edge_cut_100.wav	irregular	100	0	0	-1.00	0	0.00	0.00	0.00	0.00	0.00	0.0	0.0	0.0000	0.0	0.0	0	
+edge_cut_100.wav	invariant	100	0															same text, frames and logits for every schedule
+edge_cut_16000.wav	320	16000	26	0	-1.00	0	0.00	0.00	0.00	0.00	184.25	249.0	247.7	0.2490	8.8	184.3	0	it is such
+edge_cut_16000.wav	160	16000	26	0	-1.00	0	0.00	0.00	0.00	0.00	198.72	279.1	278.9	0.2791	12.3	198.7	0	it is such
+edge_cut_16000.wav	1600	16000	26	0	-1.00	0	0.00	0.00	0.00	0.00	199.44	274.9	271.6	0.2749	11.9	208.1	0	it is such
+edge_cut_16000.wav	irregular	16000	26	0	-1.00	0	0.00	0.00	0.00	0.00	194.89	273.6	273.5	0.2736	19.3	214.2	0	it is such
+edge_cut_16000.wav	invariant	16000	26															same text, frames and logits for every schedule
+edge_cut_319.wav	320	319	0	0	-1.00	0	0.00	0.00	0.00	0.00	0.00	0.0	0.0	0.0006	0.0	0.0	0	
+edge_cut_319.wav	160	319	0	0	-1.00	0	0.00	0.00	0.00	0.00	0.00	0.0	0.0	0.0003	0.0	0.0	0	
+edge_cut_319.wav	1600	319	0	0	-1.00	0	0.00	0.00	0.00	0.00	0.00	0.0	0.0	0.0003	0.0	0.0	0	
+edge_cut_319.wav	irregular	319	0	0	-1.00	0	0.00	0.00	0.00	0.00	0.00	0.0	0.0	0.0002	0.0	0.0	0	
+edge_cut_319.wav	invariant	319	0															same text, frames and logits for every schedule
+edge_cut_320.wav	320	320	1	0	-1.00	0	0.00	0.00	0.00	0.00	11.75	11.8	11.3	0.5876	0.0	11.8	0	
+edge_cut_320.wav	160	320	1	0	-1.00	0	0.00	0.00	0.00	0.00	11.20	11.2	11.2	0.5603	0.0	11.2	0	
+edge_cut_320.wav	1600	320	1	0	-1.00	0	0.00	0.00	0.00	0.00	10.83	10.8	10.8	0.5418	0.0	10.8	0	
+edge_cut_320.wav	irregular	320	1	0	-1.00	0	0.00	0.00	0.00	0.00	10.53	10.5	10.5	0.5270	0.0	10.5	0	
+edge_cut_320.wav	invariant	320	1															same text, frames and logits for every schedule
+edge_cut_321.wav	320	321	1	0	-1.00	0	0.00	0.00	0.00	0.00	9.83	9.8	9.8	0.4903	0.0	9.8	0	
+edge_cut_321.wav	160	321	1	0	-1.00	0	0.00	0.00	0.00	0.00	10.08	10.1	10.1	0.5030	0.0	10.1	0	
+edge_cut_321.wav	1600	321	1	0	-1.00	0	0.00	0.00	0.00	0.00	9.67	9.7	9.7	0.4822	0.0	9.7	0	
+edge_cut_321.wav	irregular	321	1	0	-1.00	0	0.00	0.00	0.00	0.00	10.01	10.0	10.0	0.4991	0.0	10.0	0	
+edge_cut_321.wav	invariant	321	1															same text, frames and logits for every schedule
+edge_cut_641.wav	320	641	2	0	-1.00	0	0.00	0.00	0.00	0.00	19.50	19.5	19.4	0.4873	0.0	19.5	0	
+edge_cut_641.wav	160	641	2	0	-1.00	0	0.00	0.00	0.00	0.00	20.51	20.5	20.5	0.5124	0.0	20.5	0	
+edge_cut_641.wav	1600	641	2	0	-1.00	0	0.00	0.00	0.00	0.00	20.81	20.8	20.8	0.5199	0.0	20.8	0	
+edge_cut_641.wav	irregular	641	2	0	-1.00	0	0.00	0.00	0.00	0.00	18.33	18.3	18.3	0.4580	0.0	18.3	0	
+edge_cut_641.wav	invariant	641	2															same text, frames and logits for every schedule
+edge_noise_3s.wav	320	48000	76	0	-1.00	2	178.93	190.91	190.91	190.91	86.13	626.1	623.8	0.2087	190.9	86.1	0	
+edge_noise_3s.wav	160	48000	76	0	-1.00	2	193.91	199.50	199.50	199.50	88.14	651.2	642.2	0.2171	199.5	88.1	0	
+edge_noise_3s.wav	1600	48000	76	0	-1.00	2	210.10	211.21	211.21	211.21	91.49	713.0	700.1	0.2377	211.2	99.0	0	
+edge_noise_3s.wav	irregular	48000	76	0	-1.00	2	238.74	264.04	264.04	264.04	85.34	786.7	785.9	0.2622	264.0	85.5	0	
+edge_noise_3s.wav	invariant	48000	76															same text, frames and logits for every schedule
+edge_silence_3s.wav	320	48000	76	0	-1.00	2	193.64	216.35	216.35	216.35	91.16	673.2	645.7	0.2244	216.4	91.2	0	
+edge_silence_3s.wav	160	48000	76	0	-1.00	2	194.69	198.38	198.38	198.38	79.59	638.8	634.8	0.2129	198.4	79.6	0	
+edge_silence_3s.wav	1600	48000	76	0	-1.00	2	179.37	196.10	196.10	196.10	85.29	612.2	601.2	0.2041	196.1	92.6	0	
+edge_silence_3s.wav	irregular	48000	76	0	-1.00	2	176.76	177.14	177.14	177.14	77.24	575.6	558.3	0.1919	177.1	77.3	0	
+edge_silence_3s.wav	invariant	48000	76															same text, frames and logits for every schedule
+real_20.wav	320	99648	156	4	1.30	4	257.26	267.79	267.79	267.79	210.50	1621.1	1611.1	0.2603	267.8	210.5	0	no suchual authority was given for the course of peal whose registries remained closed
+real_20.wav	160	99648	156	4	1.29	4	206.83	231.26	231.26	231.26	252.69	1508.4	1489.7	0.2422	231.3	252.7	0	no suchual authority was given for the course of peal whose registries remained closed
+real_20.wav	1600	99648	156	4	1.30	4	196.20	202.73	202.73	202.73	172.27	1288.6	1286.9	0.2069	202.7	179.3	0	no suchual authority was given for the course of peal whose registries remained closed
+real_20.wav	irregular	99648	156	4	1.34	4	165.73	182.11	182.11	182.11	182.72	1149.3	1146.0	0.1845	182.1	189.4	0	no suchual authority was given for the course of peal whose registries remained closed
+real_20.wav	invariant	99648	156															same text, frames and logits for every schedule
+real_21.wav	320	122688	192	5	1.30	5	204.94	292.72	292.72	292.72	205.65	1791.8	1757.5	0.2337	292.7	205.7	0	the performance was recorded and later released on the live album titled late orchestration
+real_21.wav	160	122688	192	5	1.29	5	203.39	247.30	247.30	247.30	194.68	1685.9	1671.2	0.2199	247.3	194.7	0	the performance was recorded and later released on the live album titled late orchestration
+real_21.wav	1600	122688	192	5	1.30	5	192.56	200.69	200.69	200.69	189.77	1552.7	1545.2	0.2025	200.7	195.5	0	the performance was recorded and later released on the live album titled late orchestration
+real_21.wav	irregular	122688	192	5	1.34	5	195.00	242.56	242.56	242.56	204.53	1631.7	1598.7	0.2128	242.6	204.6	0	the performance was recorded and later released on the live album titled late orchestration
+real_21.wav	invariant	122688	192															same text, frames and logits for every schedule
+real_22.wav	320	92160	145	4	1.30	4	243.95	250.15	250.15	250.15	90.24	1384.2	1347.8	0.2403	250.1	90.3	0	he is been locked up so long he has been mostly forgotten about
+real_22.wav	160	92160	145	4	1.29	4	188.50	198.44	198.44	198.44	168.88	1229.6	1203.6	0.2135	198.4	168.9	0	he is been locked up so long he has been mostly forgotten about
+real_22.wav	1600	92160	145	4	1.30	4	208.72	260.42	260.42	260.42	136.07	1420.3	1405.3	0.2466	260.4	145.9	0	he is been locked up so long he has been mostly forgotten about
+real_22.wav	irregular	92160	145	4	1.34	4	204.93	276.48	276.48	276.48	120.79	1322.6	1295.8	0.2296	276.5	120.8	0	he is been locked up so long he has been mostly forgotten about
+real_22.wav	invariant	92160	145															same text, frames and logits for every schedule
+real_23.wav	320	60159	94	2	1.30	2	164.20	196.00	196.00	196.00	202.48	748.3	727.5	0.1990	196.0	202.5	0	theqatari government and the football authorities must take notice
+real_23.wav	160	60159	94	2	1.29	2	201.97	217.11	217.11	217.11	179.82	831.2	809.5	0.2211	217.1	179.8	0	theqatari government and the football authorities must take notice
+real_23.wav	1600	60159	94	2	1.30	2	191.79	193.85	193.85	193.85	195.29	779.0	778.6	0.2072	193.8	195.4	0	theqatari government and the football authorities must take notice
+real_23.wav	irregular	60159	94	2	1.34	2	260.52	299.14	299.14	299.14	230.25	1059.7	1053.2	0.2818	299.1	230.3	0	theqatari government and the football authorities must take notice
+real_23.wav	invariant	60159	94															same text, frames and logits for every schedule
+real_24.wav	320	127040	199	6	1.30	6	188.78	244.91	244.91	244.91	43.51	1715.0	1684.9	0.2160	244.9	67.9	0	the court still sees scope for further improving the quality of spending by simply applying the current system to its full potential
+real_24.wav	160	127040	199	6	1.29	6	224.70	259.39	259.39	259.39	58.91	1963.0	1922.2	0.2472	259.4	81.5	0	the court still sees scope for further improving the quality of spending by simply applying the current system to its full potential
+real_24.wav	1600	127040	199	6	1.30	6	222.78	242.14	242.14	242.14	48.23	1893.0	1873.9	0.2384	242.1	65.6	0	the court still sees scope for further improving the quality of spending by simply applying the current system to its full potential
+real_24.wav	irregular	127040	199	6	1.34	6	219.51	236.31	236.31	236.31	47.02	1784.5	1748.4	0.2248	236.3	182.9	0	the court still sees scope for further improving the quality of spending by simply applying the current system to its full potential
+real_24.wav	invariant	127040	199															same text, frames and logits for every schedule
+real_25.wav	320	57121	90	2	1.30	2	193.61	215.88	215.88	215.88	138.83	779.6	754.7	0.2184	215.9	138.9	0	so that indicates that theres and menu under that menu
+real_25.wav	160	57121	90	2	1.29	2	288.77	296.79	296.79	296.79	249.09	1122.7	1119.6	0.3145	296.8	249.2	0	so that indicates that theres and menu under that menu
+real_25.wav	1600	57121	90	2	1.30	2	270.04	288.26	288.26	288.26	227.72	1084.3	1080.8	0.3037	288.3	237.4	0	so that indicates that theres and menu under that menu
+real_25.wav	irregular	57121	90	2	1.34	2	226.46	232.91	232.91	232.91	163.88	855.7	830.9	0.2397	232.9	171.2	0	so that indicates that theres and menu under that menu
+real_25.wav	invariant	57121	90															same text, frames and logits for every schedule
+real_26.wav	320	61440	97	2	1.30	2	193.14	207.39	207.39	207.39	266.90	890.6	864.1	0.2319	207.4	266.9	0	yeah i think of it in terms of you know not even maybe to
+real_26.wav	160	61440	97	2	1.29	2	164.12	202.43	202.43	202.43	212.19	814.8	807.3	0.2122	202.4	212.2	0	yeah i think of it in terms of you know not even maybe to
+real_26.wav	1600	61440	97	2	1.30	2	206.86	294.15	294.15	294.15	305.78	1086.4	1071.8	0.2829	294.2	305.9	0	yeah i think of it in terms of you know not even maybe to
+real_26.wav	irregular	61440	97	2	1.34	2	284.34	288.31	288.31	288.31	286.32	1178.7	1178.5	0.3070	288.3	286.5	0	yeah i think of it in terms of you know not even maybe to
+real_26.wav	invariant	61440	97															same text, frames and logits for every schedule
+rooms_00.wav	320	111920	175	5	1.30	5	197.20	206.54	206.54	206.54	101.42	1456.6	1454.5	0.2082	206.5	101.4	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_00.wav	160	111920	175	5	1.29	5	199.01	204.60	204.60	204.60	92.16	1472.5	1453.1	0.2105	204.6	92.2	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_00.wav	1600	111920	175	5	1.30	5	193.79	213.69	213.69	213.69	120.92	1444.4	1425.3	0.2065	213.7	121.1	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_00.wav	irregular	111920	175	5	1.34	5	219.37	259.44	259.44	259.44	98.99	1656.5	1613.3	0.2368	259.4	99.1	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_00.wav	invariant	111920	175															same text, frames and logits for every schedule
+rooms_01.wav	320	111920	175	5	1.30	5	209.69	233.59	233.59	233.59	112.69	1587.5	1543.2	0.2270	233.6	112.7	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_01.wav	160	111920	175	5	1.29	5	215.48	220.89	220.89	220.89	136.13	1630.5	1611.8	0.2331	220.9	136.1	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_01.wav	1600	111920	175	5	1.30	5	209.29	265.14	265.14	265.14	104.45	1563.3	1516.6	0.2235	265.1	104.6	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_01.wav	irregular	111920	175	5	1.34	5	195.62	214.44	214.44	214.44	104.30	1437.4	1427.5	0.2055	214.4	104.5	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_01.wav	invariant	111920	175															same text, frames and logits for every schedule
+rooms_02.wav	320	111920	175	5	1.30	5	190.94	226.75	226.75	226.75	102.65	1479.3	1467.1	0.2115	226.8	102.7	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_02.wav	160	111920	175	5	1.29	5	197.04	244.36	244.36	244.36	100.45	1511.0	1494.3	0.2160	244.4	100.5	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_02.wav	1600	111920	175	5	1.30	5	206.20	222.15	222.15	222.15	113.50	1524.8	1493.3	0.2180	222.2	113.7	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_02.wav	irregular	111920	175	5	1.34	5	225.38	252.08	252.08	252.08	84.41	1633.2	1606.4	0.2335	252.1	84.6	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_02.wav	invariant	111920	175															same text, frames and logits for every schedule
+rooms_03.wav	320	111920	175	5	1.30	5	195.07	219.69	219.69	219.69	99.81	1445.8	1416.5	0.2067	219.7	99.8	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_03.wav	160	111920	175	5	1.29	5	268.60	297.33	297.33	297.33	141.37	1952.5	1937.8	0.2791	297.3	141.4	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_03.wav	1600	111920	175	5	1.30	5	227.22	304.20	304.20	304.20	109.27	1751.7	1711.5	0.2504	304.2	109.5	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_03.wav	irregular	111920	175	5	1.34	5	265.84	332.83	332.83	332.83	141.36	1942.1	1933.6	0.2776	332.8	141.7	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_03.wav	invariant	111920	175															same text, frames and logits for every schedule
+rooms_04.wav	320	111920	175	5	1.30	5	295.67	300.77	300.77	300.77	122.03	2048.5	2033.1	0.2929	300.8	122.0	0	it is such an nole ambition that it is a pity it has usually such shallow foundation
+rooms_04.wav	160	111920	175	5	1.29	5	247.11	271.92	271.92	271.92	131.39	1788.9	1767.4	0.2557	271.9	131.4	0	it is such an nole ambition that it is a pity it has usually such shallow foundation
+rooms_04.wav	1600	111920	175	5	1.30	5	225.52	245.86	245.86	245.86	106.30	1646.4	1604.5	0.2354	245.9	106.5	0	it is such an nole ambition that it is a pity it has usually such shallow foundation
+rooms_04.wav	irregular	111920	175	5	1.34	5	194.08	220.06	220.06	220.06	87.23	1445.6	1416.2	0.2067	220.1	87.4	0	it is such an nole ambition that it is a pity it has usually such shallow foundation
+rooms_04.wav	invariant	111920	175															same text, frames and logits for every schedule
+rooms_05.wav	320	111920	175	5	1.30	5	202.70	206.65	206.65	206.65	100.65	1473.2	1455.8	0.2106	206.6	100.7	0	yet it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_05.wav	160	111920	175	5	1.29	5	205.67	237.11	237.11	237.11	111.78	1552.8	1522.5	0.2220	237.1	111.8	0	yet it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_05.wav	1600	111920	175	5	1.30	5	206.66	289.66	289.66	289.66	95.08	1654.1	1636.6	0.2365	289.7	95.3	0	yet it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_05.wav	irregular	111920	175	5	1.34	5	202.73	240.38	240.38	240.38	101.04	1480.1	1471.9	0.2116	240.4	101.3	0	yet it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_05.wav	invariant	111920	175															same text, frames and logits for every schedule
+rooms_06.wav	320	111920	175	5	1.30	5	183.49	189.62	189.62	189.62	83.60	1354.0	1339.2	0.1936	189.6	83.6	0	don't you is such a noble ambition that it is a pity it has usually such shallow proination
+rooms_06.wav	160	111920	175	5	1.29	5	210.77	238.47	238.47	238.47	94.80	1509.3	1505.9	0.2158	238.5	94.8	0	don't you is such a noble ambition that it is a pity it has usually such shallow proination
+rooms_06.wav	1600	111920	175	5	1.30	5	206.28	289.04	289.04	289.04	103.40	1612.3	1590.5	0.2305	289.0	103.6	0	don't you is such a noble ambition that it is a pity it has usually such shallow proination
+rooms_06.wav	irregular	111920	175	5	1.34	5	243.63	329.03	329.03	329.03	117.34	1819.2	1799.6	0.2601	329.0	117.6	0	don't you is such a noble ambition that it is a pity it has usually such shallow proination
+rooms_06.wav	invariant	111920	175															same text, frames and logits for every schedule
+rooms_07.wav	320	111920	175	5	1.30	5	279.96	312.22	312.22	312.22	153.31	2006.1	1992.6	0.2868	312.2	153.3	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_07.wav	160	111920	175	5	1.29	5	189.87	281.01	281.01	281.01	89.69	1542.2	1540.2	0.2205	281.0	89.7	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_07.wav	1600	111920	175	5	1.30	5	164.17	166.40	166.40	166.40	84.29	1213.5	1212.2	0.1735	166.4	84.4	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_07.wav	irregular	111920	175	5	1.34	5	203.55	234.87	234.87	234.87	99.06	1433.5	1431.6	0.2049	234.9	99.2	0	it is such a noble ambition that it is a pity it has usually such a shallow foundation
+rooms_07.wav	invariant	111920	175															same text, frames and logits for every schedule
+rooms_08.wav	320	111920	175	5	1.30	5	197.11	208.13	208.13	208.13	122.37	1513.0	1493.9	0.2163	208.1	122.4	0	it is such noli mission that it is a pity it has usually such a shallow foundination
+rooms_08.wav	160	111920	175	5	1.29	5	231.99	251.54	251.54	251.54	111.02	1641.4	1598.6	0.2346	251.5	111.0	0	it is such noli mission that it is a pity it has usually such a shallow foundination
+rooms_08.wav	1600	111920	175	5	1.30	5	249.59	254.75	254.75	254.75	113.08	1816.6	1787.4	0.2597	254.7	113.3	0	it is such noli mission that it is a pity it has usually such a shallow foundination
+rooms_08.wav	irregular	111920	175	5	1.34	5	296.19	308.23	308.23	308.23	144.38	2005.5	1978.7	0.2867	308.2	144.6	0	it is such noli mission that it is a pity it has usually such a shallow foundination
+rooms_08.wav	invariant	111920	175															same text, frames and logits for every schedule
+rooms_09.wav	320	111920	175	5	1.30	5	219.77	226.15	226.15	226.15	104.22	1672.7	1644.1	0.2391	226.2	104.2	0	it is such a noble ambition that it is a pity it has usually such a shallow prodation
+rooms_09.wav	160	111920	175	5	1.29	5	254.28	305.32	305.32	305.32	149.03	1896.7	1868.7	0.2712	305.3	149.0	0	it is such a noble ambition that it is a pity it has usually such a shallow prodation
+rooms_09.wav	1600	111920	175	5	1.30	5	205.45	277.49	277.49	277.49	103.20	1611.7	1575.8	0.2304	277.5	103.4	0	it is such a noble ambition that it is a pity it has usually such a shallow prodation
+rooms_09.wav	irregular	111920	175	5	1.34	5	225.16	251.23	251.23	251.23	107.95	1580.2	1577.4	0.2259	251.2	108.2	0	it is such a noble ambition that it is a pity it has usually such a shallow prodation
+rooms_09.wav	invariant	111920	175															same text, frames and logits for every schedule
+rooms_10.wav	320	169600	266	8	1.30	8	204.92	295.04	295.04	295.04	71.57	2742.6	2733.1	0.2587	295.0	71.6	0	an actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event
+rooms_10.wav	160	169600	266	8	1.29	8	218.36	283.68	283.68	283.68	71.67	2522.9	2478.9	0.2380	283.7	71.7	0	an actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event
+rooms_10.wav	1600	169600	266	8	1.30	8	207.44	301.04	301.04	301.04	72.32	2440.0	2390.9	0.2302	301.0	72.5	0	an actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event
+rooms_10.wav	irregular	169600	266	8	1.34	8	221.49	301.12	301.12	301.12	69.93	2546.2	2486.6	0.2402	301.1	89.1	0	an actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event
+rooms_10.wav	invariant	169600	266															same text, frames and logits for every schedule
+rooms_11.wav	320	169600	266	8	1.30	8	245.42	286.71	286.71	286.71	84.04	2746.3	2732.2	0.2591	286.7	84.1	0	an actual fact there are doubtless various factors that concur in giving us the filling of greater or less remoteness in some remembered event
+rooms_11.wav	160	169600	266	8	1.29	8	223.83	334.80	334.80	334.80	121.80	2760.6	2736.7	0.2604	334.8	132.2	0	an actual fact there are doubtless various factors that concur in giving us the filling of greater or less remoteness in some remembered event
+rooms_11.wav	1600	169600	266	8	1.30	8	208.47	288.72	288.72	288.72	104.51	2608.4	2576.2	0.2461	288.7	104.8	0	an actual fact there are doubtless various factors that concur in giving us the filling of greater or less remoteness in some remembered event
+rooms_11.wav	irregular	169600	266	8	1.34	8	216.20	305.23	305.23	305.23	84.43	2530.2	2482.0	0.2387	305.2	84.6	0	an actual fact there are doubtless various factors that concur in giving us the filling of greater or less remoteness in some remembered event
+rooms_11.wav	invariant	169600	266															same text, frames and logits for every schedule
+rooms_12.wav	320	169600	266	8	1.30	8	294.74	307.61	307.61	307.61	72.19	3074.0	3054.3	0.2900	307.6	72.2	0	an actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness and some remembered events
+rooms_12.wav	160	169600	266	8	1.29	8	198.37	238.13	238.13	238.13	57.85	2317.0	2263.7	0.2186	238.1	57.9	0	an actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness and some remembered events
+rooms_12.wav	1600	169600	266	8	1.30	8	162.92	208.47	208.47	208.47	57.39	1873.7	1871.2	0.1768	208.5	57.6	0	an actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness and some remembered events
+rooms_12.wav	irregular	169600	266	8	1.34	8	168.71	191.55	191.55	191.55	84.62	1847.4	1837.1	0.1743	191.6	84.9	0	an actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness and some remembered events
+rooms_12.wav	invariant	169600	266															same text, frames and logits for every schedule
+rooms_13.wav	320	169600	266	8	1.30	8	247.48	323.34	323.34	323.34	87.57	2834.5	2828.5	0.2674	323.3	91.3	0	an act fact there are doubtless various factors that concur in giving us the billing of greater or less remoteness in some remembered event
+rooms_13.wav	160	169600	266	8	1.29	8	198.40	234.14	234.14	234.14	81.48	2379.9	2356.9	0.2245	234.1	81.5	0	an act fact there are doubtless various factors that concur in giving us the billing of greater or less remoteness in some remembered event
+rooms_13.wav	1600	169600	266	8	1.30	8	201.65	256.93	256.93	256.93	75.51	2381.8	2353.5	0.2247	256.9	75.8	0	an act fact there are doubtless various factors that concur in giving us the billing of greater or less remoteness in some remembered event
+rooms_13.wav	irregular	169600	266	8	1.34	8	209.09	285.78	285.78	285.78	111.69	2432.0	2401.2	0.2294	285.8	181.6	0	an act fact there are doubtless various factors that concur in giving us the billing of greater or less remoteness in some remembered event
+rooms_13.wav	invariant	169600	266															same text, frames and logits for every schedule
+rooms_14.wav	320	169600	266	8	1.30	8	257.58	294.81	294.81	294.81	105.03	2806.1	2760.7	0.2647	294.8	105.0	0	an actual fact there are doubtless various factors that concur in giving us the fillly a greater or less remoteness and someffion of event
+rooms_14.wav	160	169600	266	8	1.29	8	198.99	265.46	265.46	265.46	70.13	2370.3	2363.1	0.2236	265.5	70.1	0	an actual fact there are doubtless various factors that concur in giving us the fillly a greater or less remoteness and someffion of event
+rooms_14.wav	1600	169600	266	8	1.30	8	212.12	248.31	248.31	248.31	96.57	2479.3	2419.5	0.2339	248.3	96.8	0	an actual fact there are doubtless various factors that concur in giving us the fillly a greater or less remoteness and someffion of event
+rooms_14.wav	irregular	169600	266	8	1.34	8	228.60	303.38	303.38	303.38	69.44	2741.9	2714.4	0.2587	303.4	93.2	0	an actual fact there are doubtless various factors that concur in giving us the fillly a greater or less remoteness and someffion of event
+rooms_14.wav	invariant	169600	266															same text, frames and logits for every schedule
+rooms_15.wav	320	169600	266	8	1.30	8	196.43	246.93	246.93	246.93	63.92	2301.8	2277.8	0.2172	246.9	63.9	0	an act fact there are doubtless various factors that concur giving us to feellling a greater or less remoteness in some remembered event
+rooms_15.wav	160	169600	266	8	1.29	8	218.63	246.38	246.38	246.38	71.13	2553.9	2517.4	0.2409	246.4	71.1	0	an act fact there are doubtless various factors that concur giving us to feellling a greater or less remoteness in some remembered event
+rooms_15.wav	1600	169600	266	8	1.30	8	216.26	282.51	282.51	282.51	72.45	2519.1	2475.9	0.2377	282.5	72.7	0	an act fact there are doubtless various factors that concur giving us to feellling a greater or less remoteness in some remembered event
+rooms_15.wav	irregular	169600	266	8	1.34	8	216.24	314.14	314.14	314.14	66.52	2555.4	2512.9	0.2411	314.1	108.1	0	an act fact there are doubtless various factors that concur giving us to feellling a greater or less remoteness in some remembered event
+rooms_15.wav	invariant	169600	266															same text, frames and logits for every schedule
+rooms_16.wav	320	169600	266	8	1.30	8	199.17	269.48	269.48	269.48	69.10	2375.8	2335.3	0.2241	269.5	69.1	0	in actual fact there are doubtless various factors that concur giving us i a greater or less remoteness in some so la time
+rooms_16.wav	160	169600	266	8	1.29	8	199.45	292.84	292.84	292.84	58.18	2509.1	2500.7	0.2367	292.8	58.2	0	in actual fact there are doubtless various factors that concur giving us i a greater or less remoteness in some so la time
+rooms_16.wav	1600	169600	266	8	1.30	8	217.58	279.76	279.76	279.76	86.58	2449.9	2391.1	0.2311	279.8	86.8	0	in actual fact there are doubtless various factors that concur giving us i a greater or less remoteness in some so la time
+rooms_16.wav	irregular	169600	266	8	1.34	8	242.70	304.88	304.88	304.88	102.08	2769.8	2714.0	0.2613	304.9	186.3	0	in actual fact there are doubtless various factors that concur giving us i a greater or less remoteness in some so la time
+rooms_16.wav	invariant	169600	266															same text, frames and logits for every schedule
+rooms_17.wav	320	169600	266	8	1.30	8	220.66	270.85	270.85	270.85	113.10	2599.0	2498.8	0.2452	270.9	113.1	0	an actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event
+rooms_17.wav	160	169600	266	8	1.29	8	163.36	170.37	170.37	170.37	56.52	1849.1	1837.1	0.1744	170.4	56.5	0	an actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event
+rooms_17.wav	1600	169600	266	8	1.30	8	158.22	227.97	227.97	227.97	84.07	2011.6	1984.4	0.1898	228.0	84.2	0	an actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event
+rooms_17.wav	irregular	169600	266	8	1.34	8	237.30	276.76	276.76	276.76	83.92	2687.6	2650.2	0.2535	276.8	161.5	0	an actual fact there are doubtless various factors that concur in giving us the feeling of greater or less remoteness in some remembered event
+rooms_17.wav	invariant	169600	266															same text, frames and logits for every schedule
+rooms_18.wav	320	169600	266	8	1.30	8	207.61	237.81	237.81	237.81	80.82	2298.6	2258.0	0.2168	237.8	80.8	0	an actual fact there are doubtless various factors that concur in giving us to feeling of greater or less remoteness in some remembered event
+rooms_18.wav	160	169600	266	8	1.29	8	204.58	258.37	258.37	258.37	73.70	2386.7	2332.3	0.2252	258.4	73.7	0	an actual fact there are doubtless various factors that concur in giving us to feeling of greater or less remoteness in some remembered event
+rooms_18.wav	1600	169600	266	8	1.30	8	205.85	248.90	248.90	248.90	57.11	2265.3	2231.5	0.2137	248.9	57.3	0	an actual fact there are doubtless various factors that concur in giving us to feeling of greater or less remoteness in some remembered event
+rooms_18.wav	irregular	169600	266	8	1.34	8	207.07	259.72	259.72	259.72	71.13	2399.2	2347.6	0.2263	259.7	100.1	0	an actual fact there are doubtless various factors that concur in giving us to feeling of greater or less remoteness in some remembered event
+rooms_18.wav	invariant	169600	266															same text, frames and logits for every schedule
+rooms_19.wav	320	169600	266	8	1.30	8	211.25	250.34	250.34	250.34	85.90	2488.5	2440.7	0.2348	250.3	85.9	0	an actual fact there are doubtless various factors that conccur in giving us the filling a greater or less remoteness and some remembered event
+rooms_19.wav	160	169600	266	8	1.29	8	195.31	232.09	232.09	232.09	71.91	2326.4	2325.2	0.2195	232.1	71.9	0	an actual fact there are doubtless various factors that conccur in giving us the filling a greater or less remoteness and some remembered event
+rooms_19.wav	1600	169600	266	8	1.30	8	211.97	276.99	276.99	276.99	94.44	2445.1	2420.4	0.2307	277.0	94.7	0	an actual fact there are doubtless various factors that conccur in giving us the filling a greater or less remoteness and some remembered event
+rooms_19.wav	irregular	169600	266	8	1.34	8	212.38	278.44	278.44	278.44	66.79	2365.5	2343.6	0.2232	278.4	67.0	0	an actual fact there are doubtless various factors that conccur in giving us the filling a greater or less remoteness and some remembered event
+rooms_19.wav	invariant	169600	266															same text, frames and logits for every schedule

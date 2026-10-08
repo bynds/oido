@@ -1,0 +1,8 @@
+label: stream-host
+binary: build/host/oido_stream_replay (d1c38c74e0e671550bed1863a0a060c63df4b301608f6d0ad666f08e7755e90c)
+model: ./models/oido_stream.tnm (d815ad97ab3def101a267531db0778395c7e8eab9c09571ae4cabca71f5faa11)
+runner: native
+jobs: 1
+host: Linux 6.18.44-fc-v80 x86_64; Intel(R) Xeon(R) Processor @ 2.10GHz
+date: 2026-10-08T09:11:37Z
+exit: 0

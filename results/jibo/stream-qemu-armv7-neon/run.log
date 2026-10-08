@@ -1,0 +1,6 @@
+kernels: neon
+stream: chunk 0, left 0 (0 = model default); created in 324.9 ms, 3271764 bytes of state
+peak RSS 33748 KiB; 0 bytes outstanding after free; 0 failure(s)
+kernels: neon
+stream: chunk 0, left 0 (0 = model default); created in 546.7 ms, 3271764 bytes of state
+peak RSS 33772 KiB; 0 bytes outstanding after free; 0 failure(s)

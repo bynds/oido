@@ -1,0 +1,5 @@
+run	clips	words	errors	WER%	WER%_clean_rooms	WER%_noisy_rooms	WER%_real	negatives_with_text
+nemo8 greedy (utterance)	27	518	41	7.9	0.0	9.3	6.1	edge_silence_3s
+nemo8 + LM beam 4 (utterance)	27	518	38	7.3	0.0	8.2	7.1	edge_silence_3s
+oido_stream greedy, full context	27	518	31	6.0	0.0	6.3	7.1	-
+oido_stream greedy, streaming 32/128	27	518	59	11.4	2.4	12.7	10.2	-

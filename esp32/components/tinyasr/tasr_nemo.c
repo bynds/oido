@@ -1,7 +1,8 @@
 // tasr_nemo: utterance-level engine for NVIDIA NeMo Conformer-CTC small (rel-pos MHSA, full context), int8.
 // Mirrors train/nemo_small.py + train/nemo_eval.py (--bits 8 --att8) arithmetic.
 // Modified 2026-10-08 for the Jibo port (ports/jibo): loader header/bounds/alignment/size validation, allocation
-// checks in load and stream creation, NaN-safe lookup indices, stream truncation flag. Arithmetic is unchanged.
+// checks in load and stream creation, NaN-safe lookup indices, stream truncation flag, 64-bit profiler timestamps
+// off the ESP32 and tasr_nemo_profile_reset. Arithmetic is unchanged.
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,24 +21,28 @@
 #ifdef TASR_PROFILE
 #ifdef ESP_PLATFORM
 #include "esp_cpu.h"
-static inline uint32_t nts(void) { return esp_cpu_get_cycle_count(); }
+typedef uint32_t nts_t;  // CPU cycles; intervals are short enough for 32-bit differences
+static inline nts_t nts(void) { return esp_cpu_get_cycle_count(); }
 #else
 #include <time.h>
-static inline uint32_t nts(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return (uint32_t)(t.tv_sec * 1000000000ull + t.tv_nsec); }
+typedef uint64_t nts_t;  // nanoseconds: 32 bits would wrap within an interval of 4.29 s
+static inline nts_t nts(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec * 1000000000ull + t.tv_nsec; }
 #endif
 enum { N_FEAT, N_CONV0, N_IM2COL, N_CONV2, N_SUB, N_LN, N_GEMM, N_QUANT, N_ACT, N_QKV8, N_POS, N_ATT, N_DW, N_HEAD, N_NP };
 static const char *nprof_names[N_NP] = {"features", "conv0", "im2col", "gemm_fe", "gemm_k704", "layernorm", "gemm", "quant",
                                         "act", "qkv_int8", "pos", "attention", "dwconv", "head+dec"};
 static uint64_t nprof[N_NP];
-#define NB(v) uint32_t v = nts()
-#define NE(v, c) nprof[c] += (uint32_t)(nts() - v)
+#define NB(v) nts_t v = nts()
+#define NE(v, c) nprof[c] += (nts_t)(nts() - v)
 const char *tasr_nemo_profile_name(int i) { return i < N_NP ? nprof_names[i] : 0; }
 uint64_t tasr_nemo_profile_value(int i) { return i < N_NP ? nprof[i] : 0; }
+void tasr_nemo_profile_reset(void) { memset(nprof, 0, sizeof(nprof)); }
 #else
 #define NB(v)
 #define NE(v, c)
 const char *tasr_nemo_profile_name(int i) { (void)i; return 0; }
 uint64_t tasr_nemo_profile_value(int i) { (void)i; return 0; }
+void tasr_nemo_profile_reset(void) {}
 #endif
 
 typedef struct {

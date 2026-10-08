@@ -1,0 +1,7 @@
+compiler: arm-linux-gnueabihf-gcc
+arm-linux-gnueabihf-gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+flags: -O2 -std=c11 -D_DEFAULT_SOURCE -D_POSIX_C_SOURCE=200809L -ffp-contract=off -fno-fast-math -fno-tree-vectorize -DTASR_NO_SIMD -I./esp32/components/tinyasr/include -I./esp32/components/tinyasr -I./ports/jibo -Wall -Wno-unused-function -march=armv7-a -mfpu=neon -mfloat-abi=hard -nostdinc -isystem /usr/lib/gcc-cross/arm-linux-gnueabihf/13/include -isystem <scratch>/sysroot-2.21/usr/include/arm-linux-gnueabihf -isystem <scratch>/sysroot-2.21/usr/include -DTASR_KERNEL_DISPATCH -DTASR_NEON
+link: -B<scratch>/sysroot-2.21/usr/lib/arm-linux-gnueabihf/ -L<scratch>/sysroot-2.21/usr/lib/arm-linux-gnueabihf -L<scratch>/sysroot-2.21/lib/arm-linux-gnueabihf -Wl,--sysroot=<scratch>/sysroot-2.21 -Wl,-rpath-link,<scratch>/sysroot-2.21/lib/arm-linux-gnueabihf -static-libgcc -lm
+sources: esp32/components/tinyasr/tinyasr.c esp32/components/tinyasr/kernels.c esp32/components/tinyasr/tinyasr_lm.c esp32/components/tinyasr/tasr_nemo.c esp32/components/tinyasr/tasr_seg.c ports/jibo/kernels_neon.c
+source: 26827abd0a41df84d14bcd5d7c5a33b733804e70 (uncommitted changes)
+sysroot: <scratch>/sysroot-2.21

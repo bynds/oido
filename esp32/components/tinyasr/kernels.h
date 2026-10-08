@@ -1,4 +1,5 @@
 #pragma once
+// Modified 2026-10-08 for the Jibo port (ports/jibo): optional TASR_KERNEL_DISPATCH renaming of the portable kernels.
 #include <stdint.h>
 
 typedef struct {
@@ -26,3 +27,15 @@ void tasr_gemm_blk16(const int8_t *tile, int kp, const int8_t *x, int ldq, int T
 // out[t] = dot48(q, x + t*ldx) (both 16-byte aligned)
 void tasr_gemm_s8_xr(const int8_t *W, int kp, int nb, const int8_t *x, int ldq, int T, int32_t *acc);
 void tasr_dot48_rows(const int8_t *q, const int8_t *x, int ldx, int T, int32_t *out);
+
+#ifdef TASR_KERNEL_DISPATCH
+// Linux ports: the portable C kernels under their own names (kernels.c), the public names above dispatching to them
+// or to a SIMD version (ports/jibo/kernels_neon.c). Results are identical either way (exact int32 arithmetic).
+void tasr_dot_rows_s8_scalar(const int8_t *w, const int8_t *x, int ldq, int T, int kp, int32_t *out);
+void tasr_gemm_blk16_scalar(const int8_t *tile, int kp, const int8_t *x, int ldq, int T, int32_t *out);
+void tasr_gemm_s8_xr_scalar(const int8_t *W, int kp, int nb, const int8_t *x, int ldq, int T, int32_t *acc);
+void tasr_dot48_rows_scalar(const int8_t *q, const int8_t *x, int ldx, int T, int32_t *out);
+extern int tasr_kernel_force_scalar;   // nonzero: the public kernels use the *_scalar versions
+const char *tasr_kernel_backend(void);  // "neon" or "scalar" (what the public kernels currently use)
+#endif
+

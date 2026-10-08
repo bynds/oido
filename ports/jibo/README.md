@@ -1,209 +1,266 @@
 # Oído on the original Jibo: port status
 
 Native, local English transcription on Jibo's existing firmware (Tegra K1, 32-bit ARMv7 hard float, glibc 2.21),
-with Oído's own engine and models. Port code lives here; the only upstream source changed is the NeMo engine's
-loader/robustness code (`esp32/components/tinyasr/tasr_nemo.{c,h}`, see [Engine changes](#engine-changes)), which
-leaves every model output bit-identical.
+with Oído's own engine and models. Port code lives here. Upstream sources changed: the NeMo engine's loader and
+robustness code and its Linux profiler (`esp32/components/tinyasr/tasr_nemo.{c,h}`), and an opt-in renaming hook
+in the kernels (`kernels.{c,h}`); see [Engine changes](#engine-changes). Every model output is bit-identical to the
+unmodified engine's.
 
-**Status (8 October 2026): milestones 1 (baseline, build, ABI) and 2 (validation, lifecycle) done on the host and
-in an ARM emulator. Not yet run on a Jibo.** Every result below names where it ran. No result here comes from a robot.
+**Status (8 October 2026): everything that can be done without the robot is done for milestones 1–6, on the host
+and in an ARM emulator. Nothing has run on a Jibo.** Every result below names where it ran.
 
-| Environment | State |
+| Milestone | State |
 |---|---|
-| Host scalar (x86-64, GCC 13.3) | built; reference transcripts and logits for 35 fixtures; clean under ASan/UBSan |
-| ARMv7 scalar, stand-in toolchain | built; passes the ABI check (needs `GLIBC_2.17` at most; libc, libm, loader only) |
-| ARMv7 scalar under qemu-arm | bit-identical logits to host on 35/35 fixtures with the same libm (glibc 2.39); with Jibo's glibc 2.21 libm, 28/35 transcripts identical, all differences traced to 1-ulp `logf` results |
+| 1. Baseline, builds, ABI | done: host and ARMv7 builds, ABI-clean (libc/libm/loader, `GLIBC_2.17` at most); emulated ARM bit-identical to host given the same libm |
+| 2. Validation, lifecycle | done: loader validation, allocation-failure cleanup, NaN-safe lookups; fuzz-style test under ASan/UBSan |
+| 3. NEON int8 kernels | done in emulation: exact against the C kernels (11,185 kernel cases; all 35 fixtures bit-identical end to end); **speed unmeasured** (needs the robot: `robot-run.sh kernels`) |
+| 4. Streaming replay | done: block-size invariance on 35/35 fixtures (host, ARM scalar, ARM NEON); lifecycle test |
+| 5. Service | done except live audio: persistent process, bounded queue, overrun reporting, JSON events, stdin or 0600 socket; tested under TSan and ASan |
+| 6. Language model | host comparison done; robot cost pending (`robot-run.sh lm`) |
+| 7. GPU | not started, by design: only if robot profiling shows the CPU cannot meet the budget |
+| Physical Jibo | **pending**: no route to the robot from here; `scripts/robot-run.sh` is ready and dry-run tested |
 | Owner's `jibo-armcc` (Linaro GCC 4.8.4) | **not built**: the wrapper is not in this environment |
-| Physical Jibo CPU | **pending**: no robot access from here (`scripts/robot-run.sh` is ready for the owner) |
-| Model validation and allocation failures (milestone 2) | done; `tests/run-tests.sh` under ASan/UBSan |
-| NEON, streaming, live audio, LM, GPU | not started (milestones 3–7) |
+| Live audio endpoint | **unknown**: must be recovered on the robot (format, channel, rate, access) |
 
 ## Layout
 
 ```text
 ports/jibo/
-  README.md               this file
-  build-jibo.sh           host and ARMv7 scalar builds into build/host and build/jibo-scalar
-  check-jibo-abi.sh       ELF/ABI gate, copied from the Decider port (provenance in its header)
-  oido_cli.c              bounded WAV front end: wall + CPU time, allocation accounting, logit dump, strict exit
-  tests/libm_fingerprint.c  hashes of logf/expf results: tells which libm (and so which reference) applies
-  tests/test_model_load.c   loader/stream constructor vs truncation, bad headers, misalignment, failing allocations
-  tests/run-tests.sh        builds and runs the host tests under ASan/UBSan
+  README.md                 this file
+  build-jibo.sh             builds: host, host-profile, jibo (scalar), jibo-neon, jibo-profile
+  check-jibo-abi.sh         ELF/ABI gate, copied from the Decider port (provenance in its header)
+  oido_cli.c                utterance transcription: bounded WAV input, wall + CPU time, allocations, logits,
+                            optional LM beam search, profile output, strict exit status
+  oido_stream_replay.c      streaming replay: block schedules, invariance check, chunk timing, modeled latency
+  oido_service.c            persistent recognizer: queue, partial/final JSON events, stdin or Unix socket
+  oido_feed.c               WAV -> service protocol (optionally paced at real time), for tests and the robot
+  kernels_neon.c            kernel dispatch: ARMv7 NEON int8 kernels, force-scalar switch, shape statistics
+  kernels_dispatch.h        statistics interface of the dispatch layer
+  port_util.{c,h}           WAV reader, timing, allocation accounting shared by the programs
+  sha256.{c,h}              model hash reported by the service
+  tests/
+    run-tests.sh            all host tests under sanitizers, plus the NEON kernel test under qemu if available
+    test_model_load.c       loader/stream constructor vs truncation, bad headers, misalignment, failing allocations
+    test_kernels.c          dispatched (NEON) vs C kernels, exact, every branch and edge case
+    bench_kernels.c         kernel speed on the model's hot shapes, scalar vs NEON (meaningful on the robot only)
+    test_stream_lifecycle.c reset/reuse, leakage, finish semantics, chunk boundaries, truncation, two streams
+    test_service.py         oido_service end to end (host; standard library Python)
+    libm_fingerprint.c      hashes of logf/expf results: tells which libm (and so which reference) applies
   scripts/
-    model-manifest.sh     model sizes, SHA-256, TNM1 header fields -> manifests/models.tsv
-    make-fixtures.sh      fixture pack -> build/fixtures, hashes -> manifests/
-    run-baseline.sh       oido_cli over the fixtures -> build/runs/LABEL (native, or RUNNER=qemu-arm ...)
-    compare-runs.py       same-model comparison of two runs: transcripts, frames, logit error, first divergence
-    robot-run.sh          owner-run deploy/status/run/cleanup on the robot (never run so far)
-manifests/                upstream commit, model and fixture hashes, toolchain provenance
-results/jibo/             the recorded results of this milestone
+    model-manifest.sh       model sizes, SHA-256, TNM1 header fields -> manifests/models.tsv
+    make-fixtures.sh        fixture pack -> build/fixtures, hashes -> manifests/
+    run-baseline.sh         oido_cli over the fixtures -> build/runs/LABEL (native, or RUNNER=qemu-arm ...)
+    run-stream.sh           oido_stream_replay over the fixtures -> build/runs/LABEL
+    compare-runs.py         same-model comparison of two runs: transcripts, frames, logit error, first divergence
+    score.py                WER against upstream's reference transcripts of the demo clips
+    robot-run.sh            owner-run steps on the robot (JIBO_SSH=local dry-runs them on this machine)
+manifests/                  upstream commit, model and fixture hashes, toolchain provenance
+results/jibo/               recorded results (transcripts, logs, comparisons, profile); logits are regenerated
 ```
 
-`build/` is ignored by git: binaries, decoded fixtures, logits and run directories are regenerated by the scripts.
+`build/` is ignored by git.
 
 ## Reproduce
 
 ```bash
-# 1. pinned source and models (this branch is upstream f1d1ca0 plus ports/jibo, manifests, results/jibo)
+# inputs
 ports/jibo/scripts/model-manifest.sh          # fails on a missing model, an LFS pointer or a wrong magic
 ports/jibo/scripts/make-fixtures.sh           # needs ffmpeg; compare with manifests/fixtures-sha256.txt
 
-# 2. builds
-ports/jibo/build-jibo.sh host
-JIBO_CC=/path/to/jibo-armcc ports/jibo/build-jibo.sh jibo          # intended: the owner's toolchain
-JIBO_SYSROOT=/path/to/glibc-2.21-armhf ports/jibo/build-jibo.sh jibo  # stand-in (manifests/toolchain.txt)
+# builds (JIBO_CC=<jibo-armcc> is the intended toolchain; JIBO_SYSROOT is the stand-in, manifests/toolchain.txt)
+JIBO_SYSROOT=/path/to/glibc-2.21-armhf ports/jibo/build-jibo.sh all
 
-# 3. reference run, emulated ARM run, comparison
+# tests (sanitizers on the host; the NEON kernel test under qemu when JIBO_SYSROOT and qemu-arm are present)
+JIBO_SYSROOT=... ports/jibo/tests/run-tests.sh          # `quick` checks one model in the loader test
+
+# runs and comparisons
 ports/jibo/scripts/run-baseline.sh host-scalar build/host/oido_cli
-RUNNER="qemu-arm -L /path/to/sysroot" JOBS=4 \
-  ports/jibo/scripts/run-baseline.sh qemu-armv7-scalar build/jibo-scalar/oido_cli
-ports/jibo/scripts/compare-runs.py build/runs/host-scalar/{transcripts.tsv,logits} \
-  build/runs/qemu-armv7-scalar/{transcripts.tsv,logits}
+RUNNER="qemu-arm -L $JIBO_SYSROOT" JOBS=4 ports/jibo/scripts/run-baseline.sh qemu-armv7-neon build/jibo-neon/oido_cli
+ports/jibo/scripts/compare-runs.py build/runs/A/{transcripts.tsv,logits} build/runs/B/{transcripts.tsv,logits}
+ports/jibo/scripts/run-stream.sh stream-host build/host/oido_stream_replay
+build/host-profile/oido_cli --profile profile.tsv models/nemo8.tnm build/fixtures/real_2*.wav
 
-# 4. on the robot, within the agreed scope only (owner)
-JIBO_SSH=jibo-skill@<robot> JIBO_DIR=<isolated dir> ports/jibo/scripts/robot-run.sh deploy|status|run|cleanup
+# the service
+build/host/oido_feed --realtime build/fixtures/real_22.wav | build/host/oido_service models/oido_stream.tnm
+
+# on the robot, within the agreed scope only (owner); JIBO_SSH=local JIBO_DIR=/tmp/x dry-runs every step here
+JIBO_SSH=jibo-skill@<robot> JIBO_DIR=<isolated dir> ports/jibo/scripts/robot-run.sh \
+  deploy | status | kernels | run [neon|neon-forced-scalar|scalar] | stream | service | lm | cleanup
 ```
 
-Both builds compile the same scalar program: `-O2 -std=c11 -ffp-contract=off -fno-fast-math -fno-tree-vectorize
+All builds compile the same float program: `-O2 -std=c11 -ffp-contract=off -fno-fast-math -fno-tree-vectorize
 -DTASR_NO_SIMD`; ARM adds `-march=armv7-a -mfpu=neon -mfloat-abi=hard`. `ESP_PLATFORM` is never defined, so the
-ESP32-S3 PIE kernels are not compiled. `-mfpu=neon` selects the target only; there is no NEON code yet. The build
-records compiler, flags and source commit in `BUILD-INFO.txt` and the ABI check in `ABI-CHECK.txt`.
+ESP32-S3 kernels are not compiled. NEON is used only by the explicit int8 kernels (`jibo-neon`), whose sums are exact,
+and `OIDO_KERNELS=scalar` switches the same binary back to the C kernels. Each build records compiler, flags and
+source in `BUILD-INFO.txt` and its ABI check in `ABI-CHECK.txt`.
 
 ## Inputs
 
-**Models** (`manifests/models.tsv`): the repository's `models/nemo8.tnm` (13,982,621 bytes, SHA-256 `452e332e…`)
-and `models/oido_stream.tnm` (13,983,264 bytes, `d815ad97…`) are real TNM1 files, not LFS pointers. Their headers
-match the published architecture: d 176, 4 heads, ff 704, conv kernel 31, 16 layers, vocabulary 1024, 8-bit.
-`nemo8` has flags 0; `oido_stream` has flags 3, stream chunk 32 and left context 128 (1.28 s and 5.12 s), not the
-header comment's fallback of 16. Sizes equal the Hugging Face files in `lokutor-ai/oido-ctc-small-int8` and
-`lokutor-ai/oido-ctc-small-stream-int8` (checked through the Hugging Face connector); their SHA-256 and the model
-repositories' revisions could **not** be read here (huggingface.co is blocked by this environment's network policy),
-so that cross-check is still open. Weight licences: `nemo8` CC-BY-4.0, `oido_stream` CC-BY-SA-4.0 (see `NOTICE`).
+**Models** (`manifests/models.tsv`): `models/nemo8.tnm` (13,982,621 bytes, SHA-256 `452e332e…`, CC-BY-4.0),
+`models/oido_stream.tnm` (13,983,264 bytes, `d815ad97…`, CC-BY-SA-4.0) and `models/nemo_lm.tlm` (1,288,852 bytes,
+`00f174f8…`, CC-BY-4.0) are real files, not LFS pointers. Headers match the published architecture: d 176, 4 heads,
+ff 704, kernel 31, 16 layers, vocabulary 1024, 8-bit. `oido_stream` has flags 3, stream chunk 32 and left context
+128 (1.28 s and 5.12 s), not the header comment's fallback of 16. Sizes equal the Hugging Face files of
+`lokutor-ai/oido-ctc-small-int8` and `-stream-int8`; their SHA-256 and repository revisions could **not** be read
+(huggingface.co is blocked by this environment's network policy).
 
 **Fixtures** (`scripts/make-fixtures.sh`): the 27 clips upstream publishes in `docs/samples` (LibriSpeech
 CC-BY-4.0 with DEMAND noise CC-BY-4.0 and simulated rooms, Common Voice 17 CC0, VoxPopuli CC0, AMI CC-BY-4.0;
 credits in `docs/index.html`), decoded from 48 kbps MP3 (already 16 kHz mono: no resampling, no downmix); digital
 silence and seeded white noise (3 s each); one clip cut to 100, 319, 320, 321, 641 and 16,000 samples; and a 22.6 s
 concatenation that must be refused by the 20 s bound. These are not robot recordings and not a held-out set.
+Upstream's `host_hyp` strings are LM beam-4 decodes of the pre-MP3 audio (`eval/make_demo_page.py:128`), so they are
+not a reference for greedy output here; the reference is this repository's own host build on these exact files.
 
-The decoded MP3s are not the audio upstream scored, and upstream's `host_hyp` strings in `docs/samples/results.json`
-were LM beam-4 decodes (`eval/make_demo_page.py:128`), so our greedy transcripts agree with them on only 17 of 27
-clips. That is expected and is not a correctness signal; the golden reference is this repository's own host build
-on these exact WAV files.
+## Programs
 
-## oido_cli
+**`oido_cli`** (utterance mode). The upstream `tasr_cli` still builds and agrees with it, but exits 0 after skipped
+files, times with `clock()`, accepts truncated WAV data and has no memory figures. `oido_cli` takes TNM1 models;
+accepts only RIFF/WAVE PCM 16-bit mono 16 kHz, rejecting truncated chunks, odd lengths and anything above
+`--max-seconds` (default 20); exits 1 on any failure; reports wall (`CLOCK_MONOTONIC`) and process CPU time as
+`wall_rtf` and `cpu_rtf`; counts engine allocations through the `tasr_alloc` hook (keeping its zeroed, 16-byte
+aligned contract) and fails a file that leaves any outstanding; prints peak RSS; writes raw CTC logits
+(`--logits DIR`); flags a transcript near its buffer's end as possibly truncated; optionally decodes with the LM
+(`--lm`, `--beam`, `--lm-weight`, `--token-bonus`, logging the values in use); writes stage times and kernel shapes
+in profile builds (`--profile FILE`); and aborts with a message if an engine allocation fails mid-inference, since
+`tasr_nemo_transcribe` does not check its working buffers.
 
-`esp32/host/tasr_cli.c` still builds and gives the same transcripts on the fixtures checked (7 `real_*` clips and
-`rooms_06`). `oido_cli` is what the port measures with, because the upstream CLI exits 0 after skipped files, times
-with `clock()` (CPU only), accepts truncated WAV data, and has no memory figures. `oido_cli`:
+**`oido_stream_replay`** (milestone 4). `tasr_cli` and `oido_cli` always run full context, even for
+`oido_stream.tnm`. This program feeds each file through one persistent stream object (`tasr_nemo_stream_*`) in
+several block schedules (320, 160, 1600 samples and seeded irregular blocks of 1–4000) and fails unless the final
+text, the frame count and every logit agree across schedules. It reports partial-transcript changes, the audio time of
+the first partial, per-chunk compute p50/p95/p99, finish time, and a modeled real-time timeline (audio arriving at
+16 kHz, each block processed when it has arrived and the previous one is done): maximum backlog and end-of-audio to
+final latency. The timeline is computed from measured compute, without sleeping; on an emulator it means nothing.
 
-- takes TNM1 models only, greedy CTC only (the LM is milestone 6);
-- accepts only RIFF/WAVE PCM 16-bit mono 16 kHz with fmt before data, rejects truncated chunks, odd data lengths,
-  and anything above `--max-seconds` (default 20 s); every failure makes the exit status 1 (checked: truncated
-  header, truncated data, stereo, 8 kHz, float, junk, missing file, a WAV passed as the model);
-- reports wall time (`CLOCK_MONOTONIC`) and process CPU time separately, as `wall_rtf` and `cpu_rtf`;
-- counts engine allocations through the `tasr_alloc` hook, keeping its contract (zeroed, 16-byte aligned), and
-  fails a file if any engine allocation is outstanding afterwards; prints peak RSS (`ru_maxrss`);
-- writes raw CTC logits (`--logits DIR`, `[frames][1025]` float32, blank last) for `compare-runs.py`;
-- flags a transcript within 256 bytes of its 16 KiB buffer as possibly truncated, since the engine drops a token
-  that does not fit without saying so.
+**`oido_service`** (milestone 5). One process, one model loaded once (path fixed at startup), one recognition stream,
+one inference worker. A reader thread moves requests into a queue bounded to `--queue-seconds` of audio (default 4),
+so reading never waits for inference; audio that does not fit is dropped, the drop is recorded at its place in the
+queue, the utterance is marked `audio_discontinuity` and an `overrun` event gives the samples lost: audio is never
+spliced silently. Requests are text lines (`audio N` + N int16 samples, `end`, `reset`, `status`, `quit`, at most
+64 bytes, N ≤ 16000); anything else is a protocol error that closes the connection. Events are JSON lines: `ready`,
+`partial` (provisional; streaming models only), `final`, `overrun`, `reset`, `status`, `error`, `shutdown`. A final
+carries the text, endpoint (`end`, `max_duration`, `eof`), model id and SHA-256 (computed in-process), sample count,
+discontinuity and truncation flags, `decoder: ctc_greedy`, `confidence: null` (greedy CTC gives no calibrated
+probability), and measured timing: compute, finalization, endpoint-to-final and maximum queue wait. `status` adds
+resident set and its peak from `/proc`. Utterances reaching `--max-seconds` (default 20) are finalized there.
+Non-streaming models (`nemo8.tnm`) buffer the utterance and transcribe at the endpoint. Transport is stdin/stdout or
+`--socket PATH` (mode 0600, refused if PATH exists and is not a socket, one client at a time, model kept loaded).
+Audio and transcripts are never logged. JSON strings are fully escaped, with invalid UTF-8 replaced.
 
-The model file is validated by the engine's loader (next section). During an inference, a failed engine allocation
-ends the process with a message (`abort`), because `tasr_nemo_transcribe` does not check its working buffers.
+Not done, and needing the robot: connecting it to Jibo's processed audio. The endpoint, sample format, rate,
+channel selection and permissions of Jibo's audio service are not known here, and the service must not take
+exclusive ownership of the microphones or stack its own AGC/VAD on Jibo's processing without an A/B test. Endpointing
+stays the client's decision (`end`). Partial events must not trigger actions; only finals should reach the controller.
 
 ## Engine changes
 
-`tasr_nemo.c` and `tasr_nemo.h` carry dated modification notices. The changes, none of which touches arithmetic (the
-host run after them is bit-identical to the run before on all 35 fixtures):
+All changed upstream files carry dated modification notices. None changes arithmetic: after each change the host
+run is bit-identical to the unmodified engine on all 35 fixtures, and the ARM runs match.
 
-- **Header ranges** checked before anything else: version 1; d even, 2–1024, divisible by heads (1–16) with head
-  dimension at most 64 (fixed scratch arrays); ff 1–8192; odd kernel 1–63; 1–64 layers; 1–1024 channels;
-  vocabulary 1–8192; 4 or 8 bits; known flag bits; stream chunk/left at most 4096.
+- **Loader header ranges** checked first: version 1; d even, 2–1024, divisible by heads (1–16), head dimension ≤ 64
+  (fixed scratch arrays); ff 1–8192; odd kernel 1–63; 1–64 layers; 1–1024 channels; vocabulary 1–8192; 4 or 8 bits;
+  known flag bits; stream chunk/left ≤ 4096.
 - **Bounds-checked cursor**: no pointer is formed past the blob and no table (filterbank, depthwise weights, token
-  strings) is read before its bytes are known to be present. The original code walked token strings and the
-  filterbank before its single end-of-load check.
-- **Exact size**: the layout the header describes must end exactly at `size`. All four shipped `.tnm` files do, and
-  the ESP32 firmware passes the exact size. This refuses most wrong headers, since every dimension shapes the layout.
-- **16-byte alignment** of the blob is required: weights sit at 16-byte boundaries relative to an aligned base, so a
-  misaligned blob (e.g. from an 8-byte-aligned 32-bit `malloc`) was silently read wrongly.
+  strings) is read before its bytes are known present. The original code walked token strings and the filterbank
+  before its single end-of-load check.
+- **Exact size**: the layout must end exactly at `size` (all four shipped `.tnm` files do; the ESP32 firmware passes
+  the exact size). Every dimension shapes the layout, so this refuses most wrong headers.
+- **16-byte blob alignment** is required: weights sit at 16-byte boundaries relative to an aligned base, so a
+  misaligned blob (an 8-byte-aligned 32-bit `malloc`) was silently misread.
 - **Allocation failures** in `tasr_nemo_load` and `tasr_nemo_stream_new` free everything and return NULL (the stream
-  constructor previously checked 7 of its 36 allocations, and not the positional-encoding buffer).
+  constructor checked 7 of its 36 allocations).
 - **NaN-safe table lookups**: a header that passes every check can still mislabel the data (`ff` 703 instead of 704
-  happens to consume the same length), giving non-finite activations. The sigmoid and softmax-exponent lookups then
-  indexed their tables with INT_MIN. They now treat NaN as out of range; finite inputs take the same path as before.
-- **`tasr_nemo_stream_truncated()`**: the stream's fixed 2 KiB greedy text buffer, and a too-small `maxlen`, used to
-  drop text silently.
+  consumes the same length), giving non-finite activations; the sigmoid and softmax-exponent lookups then indexed
+  their tables with INT_MIN. NaN is now out of range; finite inputs take the same path as before.
+- **`tasr_nemo_stream_truncated()`** reports text dropped by the stream's 2 KiB buffer or a short `maxlen`.
+- **Profiler**: 64-bit nanosecond timestamps off the ESP32 (32 bits wrapped within 4.29 s) and
+  `tasr_nemo_profile_reset()`.
+- **`TASR_KERNEL_DISPATCH`** (opt-in): the portable kernels keep their code under `*_scalar` names so that
+  `kernels_neon.c` can provide the public names. Builds without the macro are unchanged.
 
-`tests/test_model_load.c` (via `tests/run-tests.sh`, ASan + UBSan, exact-size allocations so any over-read is
-caught) checks, on every shipped model: it loads, and stream support matches header flag bit 1; ~73,000 truncations
-are refused; each header word set to 0, 1, ±1, 0x7fffffff and 0xffffffff is refused, or loads and then transcribes
-and streams 0.5 s cleanly; a misaligned blob is refused; and the Nth allocation failing, for every N reached (21 in
-load, 41 in stream creation), returns NULL with nothing leaked. Remaining: `tasr_nemo_transcribe`'s own working
-allocations are unchecked (handled by the port's fail-fast allocator, above); the engine is still non-reentrant
-(static tables and profiler state), so callers serialize initialization and inference.
+`tests/test_model_load.c` (ASan + UBSan, exact-size allocations) checks on every shipped model: it loads and stream
+support matches flag bit 1; ~73,000 truncations are refused; each header word set to 0, 1, ±1, 0x7fffffff and
+0xffffffff is refused, or loads and then transcribes and streams 0.5 s cleanly; a misaligned blob is refused; the Nth
+allocation failing, for every N reached (21 in load, 41 in stream creation), returns NULL without leaks.
 
 ## Results
 
-`results/jibo/` holds the transcripts, logs and run information of each run; logits are not committed (regenerate).
+Environments: **host** = x86-64 Xeon 2.1 GHz, GCC 13.3, glibc 2.39; **qemu** = `qemu-arm` 8.2 running the ARMv7
+binaries with the sysroot's glibc 2.21 (Jibo's version) unless stated. Emulator timings are not performance figures.
 
-### Host scalar (x86-64, Xeon 2.1 GHz, one process) — reference
+### Correctness chain
 
-- All 35 fixtures transcribed; exit 0; the 22.6 s input refused with exit 1.
-- Model: 13,894,264 weight bytes referenced in place in the file buffer; 373,028 bytes of engine allocations after
-  load; peak working allocations during one utterance 1,627,024 bytes (7–10.6 s clips); peak RSS 16–19 MiB.
-- Speed on this host only: wall RTF 0.20–0.30 on the speech clips. Not a Jibo figure.
-- Digital silence yields the text `i`; seeded noise yields nothing. Inputs under 320 samples give 0 frames and no
-  text (the engine's minimum, not an error).
+| Comparison | Result |
+|---|---|
+| ARMv7 scalar (qemu, glibc 2.39) vs host | logits bit-identical, 35/35 |
+| ARMv7 scalar (qemu, glibc 2.21) vs host | 28/35 transcripts same; all differences from 1-ulp `logf` (below) |
+| ARMv7 NEON vs ARMv7 scalar (qemu, glibc 2.21), utterance mode | logits bit-identical, 35/35 |
+| ARMv7 NEON vs ARMv7 scalar (qemu, glibc 2.21), streaming | logits bit-identical, 35/35 |
+| Streaming block schedules (320/160/1600/irregular): host, ARM scalar, ARM NEON | identical text, frames, logits, 35/35 each |
+| NEON kernels vs C kernels (`test_kernels`, qemu) | 11,185 cases exact (all -128/127 extremes, tails, strides, every `tasr_qlin_range` branch); a deliberately broken NEON reduction is caught |
+| Engine after milestone-2/3 changes vs before (host, and ARM scalar) | bit-identical, 35/35 |
 
-### ARMv7 scalar under qemu-arm — correctness only
+**Libm.** With Jibo's glibc 2.21, the first stage to differ from the host is the log-mel output, whose only libm
+call is `logf` (`TASR_DEBUG_SUMS`, `debug-sums-real_23.txt`); FFT twiddles and positional encodings agree.
+glibc 2.21 and 2.39 differ by exactly 1 ulp on 155,536 of 8,388,606 `logf` inputs over the log-mel range (1.85%) and
+on 202 of 327,681 `expf` inputs (`libm-fingerprints.txt`); the differences change dynamic int8 quantization
+decisions and propagate. The seven changed transcripts are all on degraded audio (`course of peel` → `course of
+peal`). A physical-Jibo run should therefore match the **glibc 2.21 emulated runs** bit for bit, if the robot's
+`libm_fingerprint` prints the sysroot's hashes (`95cbba12` / `372829a9`); `robot-run.sh run` records it first.
 
-Emulator timings in these files are not performance figures and the RSS printed is qemu's. The same ARM binary
-(SHA-256 `ae0b8579…`, reproducible: a rebuild gave identical bytes) was run twice, under `qemu-arm -L` with two C
-libraries:
+### Profile (host, scalar, `TASR_PROFILE` + `TASR_KERNEL_STATS`; `profile-host-nemo8.tsv`)
 
-| libm the ARM binary loaded | Transcripts | Frames | Logits vs host |
-|---|---|---|---|
-| glibc 2.39 (Ubuntu's armhf cross libc, the host's version) | 35/35 same | 35/35 same | **bit-identical on every frame of every file** |
-| glibc 2.21 (the build sysroot; **Jibo's version**) | 28/35 same | 35/35 same | differ from frame 0 on the speech clips (max abs 23 on a logit, argmax differs on 0–7 frames per clip) |
+The three int8 kernels take ~95% of inference time: projections with K = 176 via `tasr_gemm_s8_xr` (40%), the
+front-end projections over long rows via `tasr_dot_rows_s8` (28%), the K = 704 feed-forward outputs (17%), attention
+(10%). Everything else (features, layer norm, activations, quantization, convolution) is under 5% together. The NEON
+kernels cover exactly these three functions; the int4 tile kernel (`nemo4.tnm` only) is not vectorized. The share on
+a Cortex-A15 may differ; `robot-run.sh kernels` measures scalar vs NEON per hot shape there.
 
-So the ARMv7 code generation reproduces the host arithmetic exactly, and the only source of difference found is the
-C library's math functions. Locating it (`TASR_DEBUG_SUMS`, `debug-sums-real_23.txt`): FFT twiddles agree, the
-first stage to differ is the log-mel output, whose only libm call is `logf` (`tasr_nemo.c:534`), and everything
-downstream follows; positional encodings (double `exp`/`sin`/`cos`) agree. `tests/libm_fingerprint.c` measures it
-directly: glibc 2.21 and 2.39 differ by exactly 1 ulp on 155,536 of 8,388,606 `logf` inputs across the log-mel
-range (1.85%) and on 202 of 327,681 `expf` inputs (`libm-fingerprints.txt`). The one-ulp log-mel differences then
-change dynamic int8 quantization decisions and propagate.
+### Memory (host)
 
-The seven changed transcripts are all on degraded audio (heavy noise, reverberation, spontaneous speech), e.g.
-`course of peel` → `course of peal`, `remoteness in some` → `remoteness and some`. This matches upstream's own
-caveat that host and emulator transcripts differ through math-library rounding; it is explained, not a tolerance.
+Model file 13.98 MB, read into one aligned buffer and used in place (13.89 MB of weights); 0.37 MB of engine state
+after load; utterance working set 1.6 MB at 7–10 s; stream object 3.27 MB (fixed, whatever the utterance length;
+no allocation while streaming); process peak RSS 16–22 MiB (CLI, replay, service). Well inside the proposed 100 MiB.
 
-Consequences for the Jibo run: Jibo's glibc is 2.21, so a physical-Jibo run should match the **glibc 2.21 emulated
-run** (`qemu-armv7-scalar/`), not the x86 host, bit for bit, if the robot's libm gives the same `libm_fingerprint`
-line as the sysroot's (`95cbba12` / `372829a9`); `robot-run.sh run` records that first. If it differs, the robot's
-libm is not stock 2.21 and the fingerprint says so before any transcript is compared. For later NEON work (G3) the
-comparison is same-target scalar against NEON, which shares a libm and must be exact.
+### Speed (host only; not a Jibo figure)
 
-### Stream model in full-context mode (host)
+Utterance mode wall RTF 0.20–0.30 (scalar). Streaming (320-sample blocks, speech clips): median chunk compute
+164–296 ms per 1.28 s chunk; end of audio to final 64–267 ms; first partial once the first chunk has run (1.3 s of
+audio). Paced at real time through the service: endpoint-to-final ~170 ms on a 3.8 s clip.
 
-`host-scalar-stream-model-fullctx/` is `oido_stream.tnm` through `tasr_nemo_transcribe`, i.e. **full context, not
-streaming**. It is a reference for that mode only; the chunked streaming path is untested (milestone 4).
+### Recognition (host; `score-host.tsv`)
+
+WER on the 27 published demo clips (518 words; MP3-decoded; not a held-out or robot set, so only a smoke test):
+
+| Model, decoder, mode | WER | negatives (silence, noise) with text |
+|---|---|---|
+| `nemo8`, greedy, utterance | 7.9% | silence → `i` |
+| `nemo8`, LM beam 4 (weight 0.3, bonus 0.5), utterance | 7.3% | silence → `i` |
+| `oido_stream`, greedy, full context | 6.0% | none |
+| `oido_stream`, greedy, streaming 32/128 | 11.4% | none |
+
+The LM helps a little here, at a cost not yet measured cleanly; it is not enabled anywhere by default. Streaming
+costs accuracy on these clips, as expected from its limited context; the service therefore also supports `nemo8` in
+utterance mode, where the final comes after the endpoint.
 
 ## Open items
 
-1. **Jibo run** (G2 on hardware): pending; this environment has no route to the robot. Next: the owner runs
-   `robot-run.sh deploy`, `status`, `run`, `cleanup` with `JIBO_SSH`/`JIBO_DIR` set, then `compare-runs.py`
-   against the glibc 2.21 emulated run (`build/runs/qemu-armv7-scalar`, regenerate with step 3). That run gives the
-   first real wall/CPU RTF, peak RSS (VmHWM) and thermal before/after, with normal services running.
-2. **Owner's toolchain**: rebuild with `JIBO_CC=<jibo-armcc>` (GCC 4.8.4) and re-run the ABI check and the qemu
-   comparison; GCC 4.8 may round or schedule differently from 13.3.
-3. **Model SHA-256 against Hugging Face**: sizes match; hashes and repository revisions unread (network policy).
-4. Allocation checks inside `tasr_nemo_transcribe` (fail-fast in the port for now); engine reentrancy audit.
-5. **NEON INT8 kernels** with a force-scalar switch and exact-integer tests (milestone 3); profile first.
-6. **Streaming replay** through `tasr_nemo_stream_*` (milestone 4); `tasr_cli` and `oido_cli` only test full
-   context, including for `oido_stream.tnm`.
-7. Silence producing `i` should be tracked once real robot audio and endpointing exist.
-8. Libm sensitivity: one-ulp `logf` differences change 20% of transcripts on degraded audio. If bit-reproducible
-   results across machines matter (e.g. host-side regression tests for the robot), a later, separately reviewed
-   change could make the log-mel front end independent of the platform libm; that would change the model's numerical
-   contract relative to upstream and must be measured, so it is not done here.
+1. **Robot runs** (owner, within the agreed scope; dry-run tested locally): `robot-run.sh deploy`, `status`,
+   `kernels` (exactness and NEON speed on the Cortex-A15), `run neon` and `run neon-forced-scalar` (compare both
+   with `build/runs/qemu-armv7-neon` via `compare-runs.py`; first real RTF, CPU time, peak RSS and thermals),
+   `stream`, `service`, `lm`, then `cleanup`. Then the same with the Decider active (G6).
+2. **Owner's toolchain**: rebuild with `JIBO_CC=<jibo-armcc>` (GCC 4.8.4), re-run the ABI check and the qemu
+   comparisons; GCC 4.8's NEON intrinsics and code generation differ from 13.3.
+3. **Live audio**: recover Jibo's processed-audio endpoint, format and channel; write the capture client for
+   `oido_service`; A/B any extra VAD/AGC; measure with playback (self-speech) and Jibo's echo cancellation.
+4. **Recognition quality (G5)**: a held-out 200–300 utterance robot-relevant set (numbers, names, negation, accents,
+   noise, self-speech), recorded with consent through the real microphone path.
+5. **Model SHA-256 against Hugging Face**: sizes match; hashes and revisions unread (network policy).
+6. `tasr_nemo_transcribe`'s working allocations are unchecked (the port's allocator aborts with a message instead);
+   the LM loader (`tasr_lm_load`) is not hardened like the model loader; use only the pinned LM. The engine is
+   non-reentrant (static tables, profiler state): one inference thread per process, as the service does.
+7. Utterance mode turns 3 s of digital silence into `i`; streaming does not. Relevant once endpointing is real.
+8. Libm sensitivity: one-ulp `logf` differences change 20% of transcripts on degraded audio. A libm-independent
+   log-mel would make results reproducible across machines but changes the numerical contract; not done.
+9. GPU (milestone 7): only if the robot's measurements show the NEON CPU path misses the budget.
