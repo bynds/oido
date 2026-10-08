@@ -1,0 +1,8 @@
+label: seg-ab-nemo8
+binary: build/host/oido_seg_ab (63cb8cc84bec7828ba35a65026096f1e7e120fff8e4d758124f380e732fe612b)
+model: models/nemo8.tnm (452e332e21f46f161e383a1f26f36294785b2782cb3252928841dd7e6480c68b)
+labels: ./build/ab/labels.tsv (e2eabee0ef757e63394c1fbd69c580be58225b1fbddf3ceef5c020dbbc48a069)
+arms: A,B,C,B25,C25
+runner: native
+date: 2026-10-08T10:44:36Z
+exit: 0

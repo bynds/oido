@@ -34,6 +34,7 @@ ports/jibo/
   oido_stream_replay.c      streaming replay: block schedules, invariance check, chunk timing, modeled latency
   oido_service.c            persistent recognizer: queue, partial/final JSON events, stdin or Unix socket
   oido_feed.c               WAV -> service protocol (optionally paced at real time), for tests and the robot
+  oido_seg_ab.c             A/B of upstream's VAD/AGC segmenter (tasr_seg.c) in front of the recognizer
   kernels_neon.c            kernel dispatch: ARMv7 NEON int8 kernels, force-scalar switch, shape statistics
   kernels_dispatch.h        statistics interface of the dispatch layer
   port_util.{c,h}           WAV reader, timing, allocation accounting shared by the programs
@@ -53,6 +54,9 @@ ports/jibo/
     run-stream.sh           oido_stream_replay over the fixtures -> build/runs/LABEL
     compare-runs.py         same-model comparison of two runs: transcripts, frames, logit error, first divergence
     score.py                WER against upstream's reference transcripts of the demo clips
+    make-ab-streams.py      simulated continuous audio with labelled utterances for the segmenter A/B
+    run-seg-ab.sh           oido_seg_ab over labelled streams (simulated, or recordings from the robot)
+    score-seg-ab.py         A/B summary per arm and condition
     robot-run.sh            owner-run steps on the robot (JIBO_SSH=local dry-runs them on this machine)
 manifests/                  upstream commit, model and fixture hashes, toolchain provenance
 results/jibo/               recorded results (transcripts, logs, comparisons, profile); logits are regenerated
@@ -244,6 +248,56 @@ The LM helps a little here, at a cost not yet measured cleanly; it is not enable
 costs accuracy on these clips, as expected from its limited context; the service therefore also supports `nemo8` in
 utterance mode, where the final comes after the endpoint.
 
+### Segmenter A/B (host; simulated audio; `seg-ab/`)
+
+Question: should upstream's segmenter (`tasr_seg.c`: energy VAD against a tracked noise floor, slow AGC towards
+-20 dBFS, 0.2 s pre-roll, utterance closed after 0.8 s of non-speech) sit between Jibo's audio and the recognizer, and
+if so with or without its AGC? `oido_seg_ab` runs, on continuous audio with labelled utterance spans:
+**A** oracle spans, raw audio; **B** `tasr_seg` boundaries with its AGC'd audio (upstream's behaviour); **C** `tasr_seg`
+boundaries with raw audio (endpointer only); **B25/C25** the same with a 0.5 s hang.
+
+**This is not the robot A/B.** No recording of Jibo's processed audio exists yet. The streams here
+(`scripts/make-ab-streams.py`) are the 27 demo clips inside continuous seeded pink noise (high-passed at 80 Hz) at
+-60 and -40 dBFS, at speech levels 0 and -20 dB, plus noise-only negatives and clip pairs 0.5 s and 1.2 s apart:
+126 streams, 132 utterances. They test the segmenter's logic on stationary noise; they say nothing about Jibo's
+microphones, its echo cancellation, its own gain stage, motor noise or the robot's own speech.
+
+| | `nemo8` WER | `oido_stream` (streaming) WER |
+|---|---|---|
+| A oracle | 26.6% (11.0%¹) | 30.9% |
+| B tasr_seg + AGC | 29.0% (12.3%¹) | 32.2% |
+| **C tasr_seg, no AGC** | **28.1% (11.0%¹)** | **31.2%** |
+| B25 | 29.2% | 32.5% |
+| C25 | 28.4% | 31.3% |
+
+¹ excluding the -20 dB speech in -40 dBFS noise condition, where even the oracle fails (90% WER) and the segmenter
+misses 24 of 27 utterances; that condition is beyond the recognizer either way.
+
+Findings:
+- **The AGC hurts, the segmentation does not.** Per stream (excluding that condition), dropping the AGC (C vs B) gave
+  fewer word errors on 18 streams and more on 8 with `nemo8` (188 vs 209 errors), and 27 vs 15 with `oido_stream`
+  (269 vs 292); with the 0.5 s hang, 18 vs 6 and 29 vs 15 (sign test p = 0.02–0.09 individually, all four in the
+  same direction). The AGC starts at +12 dB and drives 46,000 samples to full scale (clipping) across the speech
+  streams. `nemo8` normalizes each utterance's level away anyway, and `oido_stream` did not benefit either.
+  Segmentation without AGC matched the oracle spans (`nemo8`: 188 vs 188 errors; 20 streams better, 18 worse).
+- **Hang 0.5 s vs 0.8 s**: same accuracy (C25 vs C: 191 vs 188 errors, 10 vs 9 streams), utterance end detected
+  ~0.55 s sooner on average, but more utterances split at internal pauses (30 vs 28 streams with the wrong segment
+  count), while two utterances 0.5 s apart are separated only with the shorter hang.
+- **No false triggers** on noise-only streams (stationary noise; real rooms are not).
+- **Misses**: outside the extreme condition, one quiet AMI clip (`real_26`) at -20 dB speech or -40 dBFS noise.
+
+Recommendation, pending robot data: if Jibo's audio service gives no usable utterance boundary, use `tasr_seg` as an
+endpointer only (arm C: its decisions, raw audio to the recognizer), not its AGC; start with the 0.8 s hang and tune
+it on robot recordings. Nothing is wired into `oido_service` yet; it still takes `end` from its client.
+
+**The robot A/B** uses the same tools, and the recognition can run on any host because the question is the
+segmenter, not the CPU: record continuous processed audio from Jibo's audio path (with the owner's agreement and
+the speakers' consent, in the scenarios that matter: quiet room, TV, motors moving, Jibo speaking, far talker),
+write a labels file in the same format (`stream condition start_sample end_sample reference`, start = end = -1 for
+no-speech recordings), and run `scripts/run-seg-ab.sh LABEL build/host/oido_seg_ab models/nemo8.tnm labels.tsv
+recordings/` then `scripts/score-seg-ab.py --labels labels.tsv build/runs/LABEL/ab.tsv`. Compare against Jibo's own
+boundary signal, if its audio service has one, as a further arm.
+
 ## Open items
 
 1. **Robot runs** (owner, within the agreed scope; dry-run tested locally): `robot-run.sh deploy`, `status`,
@@ -253,14 +307,18 @@ utterance mode, where the final comes after the endpoint.
 2. **Owner's toolchain**: rebuild with `JIBO_CC=<jibo-armcc>` (GCC 4.8.4), re-run the ABI check and the qemu
    comparisons; GCC 4.8's NEON intrinsics and code generation differ from 13.3.
 3. **Live audio**: recover Jibo's processed-audio endpoint, format and channel; write the capture client for
-   `oido_service`; A/B any extra VAD/AGC; measure with playback (self-speech) and Jibo's echo cancellation.
+   `oido_service`; run the segmenter A/B on robot recordings (tools ready; simulated result: endpointer yes, AGC
+   no); measure with playback (self-speech) and Jibo's echo cancellation.
 4. **Recognition quality (G5)**: a held-out 200–300 utterance robot-relevant set (numbers, names, negation, accents,
    noise, self-speech), recorded with consent through the real microphone path.
 5. **Model SHA-256 against Hugging Face**: sizes match; hashes and revisions unread (network policy).
 6. `tasr_nemo_transcribe`'s working allocations are unchecked (the port's allocator aborts with a message instead);
    the LM loader (`tasr_lm_load`) is not hardened like the model loader; use only the pinned LM. The engine is
    non-reentrant (static tables, profiler state): one inference thread per process, as the service does.
-7. Utterance mode turns 3 s of digital silence into `i`; streaming does not. Relevant once endpointing is real.
+7. Utterance mode can transcribe featureless input: `nemo8` normalizes each mel band by the utterance's own mean
+   and deviation, so digital silence becomes all-zero features, and some lengths come out as text (`i` at 2.5–3.25 s,
+   `okay` at 1.5 s; 5 of 37 lengths tested). `oido_stream` (fixed normalization) and any input with real variance
+   (dither, DC, speech) do not. Only speech-bearing segments should reach `nemo8`: an endpointer (above) helps.
 8. Libm sensitivity: one-ulp `logf` differences change 20% of transcripts on degraded audio. A libm-independent
    log-mel would make results reproducible across machines but changes the numerical contract; not done.
 9. GPU (milestone 7): only if the robot's measurements show the NEON CPU path misses the budget.

@@ -9,7 +9,7 @@
 #   jibo-profile  build/jibo-profile/  jibo-neon plus TASR_PROFILE and TASR_KERNEL_STATS
 #
 # Each target builds tasr_cli (upstream CLI; not in the dispatch targets), oido_cli, oido_stream_replay, oido_service,
-# oido_feed,
+# oido_feed, oido_seg_ab,
 # libm_fingerprint and, in the
 # dispatch targets, test_kernels (NEON vs C kernels, exact) and bench_kernels (their speed on the hot shapes), and
 # records
@@ -44,7 +44,7 @@ build() {
   read -r -a lf <<<"$ldflags"
   [ -n "$dispatch" ] && src+=("$ROOT/ports/jibo/kernels_neon.c")
   mkdir -p "$out"
-  rm -f "$out/tasr_cli" "$out/oido_cli" "$out/oido_stream_replay" "$out/oido_service" "$out/oido_feed" "$out/libm_fingerprint"
+  rm -f "$out/tasr_cli" "$out/oido_cli" "$out/oido_stream_replay" "$out/oido_service" "$out/oido_feed" "$out/oido_seg_ab" "$out/libm_fingerprint"
   [ -z "$dispatch" ] && "$cc" "${FLAGS[@]}" "${cf[@]}" "$ROOT/esp32/host/tasr_cli.c" "${src[@]}" "${lf[@]}" -lm -o "$out/tasr_cli"
   "$cc" "${FLAGS[@]}" "${cf[@]}" "$ROOT/ports/jibo/oido_cli.c" "$ROOT/ports/jibo/port_util.c" "${src[@]}" "${lf[@]}" -lm \
     -o "$out/oido_cli"
@@ -54,6 +54,8 @@ build() {
     "${src[@]}" "${lf[@]}" -lm -lpthread -o "$out/oido_service"
   "$cc" "${FLAGS[@]}" "${cf[@]}" "$ROOT/ports/jibo/oido_feed.c" "$ROOT/ports/jibo/port_util.c" "${src[@]}" "${lf[@]}" -lm \
     -o "$out/oido_feed"
+  "$cc" "${FLAGS[@]}" "${cf[@]}" "$ROOT/ports/jibo/oido_seg_ab.c" "$ROOT/ports/jibo/port_util.c" "${src[@]}" "${lf[@]}" -lm \
+    -o "$out/oido_seg_ab"
   "$cc" "${FLAGS[@]}" "${cf[@]}" "$ROOT/ports/jibo/tests/libm_fingerprint.c" "${lf[@]}" -lm -o "$out/libm_fingerprint"
   rm -f "$out/test_kernels"
   [ -n "$dispatch" ] && "$cc" "${FLAGS[@]}" "${cf[@]}" "$ROOT/ports/jibo/tests/test_kernels.c" "$ENGINE/kernels.c" \
@@ -94,7 +96,7 @@ jibo_build() {  # OUT extra-cflags dispatch
   jibo_toolchain
   build "$1" "$JIBO_COMPILER" "$JIBO_CF $2" "$JIBO_LF" "$3"
   [ -n "${JIBO_SYSROOT:-}" ] && echo "sysroot: $(cd "$JIBO_SYSROOT" && pwd)" >> "$1/BUILD-INFO.txt"
-  local bins=("$1/oido_cli" "$1/oido_stream_replay" "$1/oido_service" "$1/oido_feed" "$1/libm_fingerprint")
+  local bins=("$1/oido_cli" "$1/oido_stream_replay" "$1/oido_service" "$1/oido_feed" "$1/oido_seg_ab" "$1/libm_fingerprint")
   [ -f "$1/tasr_cli" ] && bins+=("$1/tasr_cli")
   [ -f "$1/test_kernels" ] && bins+=("$1/test_kernels" "$1/bench_kernels")
   "$ROOT/ports/jibo/check-jibo-abi.sh" "${bins[@]}" | tee "$1/ABI-CHECK.txt"

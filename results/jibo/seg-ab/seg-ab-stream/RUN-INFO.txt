@@ -1,0 +1,8 @@
+label: seg-ab-stream
+binary: build/host/oido_seg_ab (63cb8cc84bec7828ba35a65026096f1e7e120fff8e4d758124f380e732fe612b)
+model: models/oido_stream.tnm (d815ad97ab3def101a267531db0778395c7e8eab9c09571ae4cabca71f5faa11)
+labels: ./build/ab/labels.tsv (e2eabee0ef757e63394c1fbd69c580be58225b1fbddf3ceef5c020dbbc48a069)
+arms: A,B,C,B25,C25
+runner: native
+date: 2026-10-08T10:48:43Z
+exit: 0
