@@ -65,3 +65,7 @@ Instructions for the 5.76 s clip (millions). Every round passed the gate before 
 | r05 | neon: two positions × four weight rows per pass in `gemm_s8_xr` (asm, 8 accumulators) | 5,424.0 | 4,988.2 | 1,663.9 (−4.7%) | 1,531.9 (−4.5%) |
 | r06 | neon: depthwise convolution with channels in NEON lanes (2 frames × 8 channels per pass) | 5,424.0 | 4,988.2 | 1,639.3 (−1.5%) | 1,507.3 (−1.6%) |
 | r07 | neon: first convolution (conv0) with frequency positions in lanes (`vld2` taps, masked ReLU, bit-pattern max) | 5,424.0 | 4,988.2 | 1,622.4 (−1.0%) | 1,490.3 (−1.1%) |
+
+Rejected (measured, not committed as code): **r08** NEON SiLU with a per-lane table gather: `act` 79.3 → 89.0 M
+(+12.3%), NEON total +0.7%. Moving four indices to core registers, eight scalar table reads and reloading them into
+lanes cost more than the vector arithmetic saved (`results/r08-neon-silu-rejected.jsonl`).
