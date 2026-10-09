@@ -197,11 +197,109 @@ static void dot_rows_s8_neon(const int8_t *w, const int8_t *x, int ldq, int T, i
     }
 }
 
+// Two positions x four weight rows per pass (8 accumulators in q8-q15): each weight load feeds two positions and
+// the per-call setup and lane reductions are shared by eight outputs. 40 instructions per 128 multiply-accumulates
+// (the 1 x 4 block: 23 per 64), same vmull.s8 / vpadal.s16 arithmetic. o0[i] = dot(x0, w_i), o1[i] = dot(x1, w_i).
+static inline void dot2x4_neon(const int8_t *x0, const int8_t *x1, const int8_t *w0, const int8_t *w1, const int8_t *w2,
+                               const int8_t *w3, int n16, int32_t *o0, int32_t *o1)
+{
+    __asm__ volatile(
+        "vmov.i32   q8, #0\n\t"
+        "vmov.i32   q9, #0\n\t"
+        "vmov.i32   q10, #0\n\t"
+        "vmov.i32   q11, #0\n\t"
+        "vmov.i32   q12, #0\n\t"
+        "vmov.i32   q13, #0\n\t"
+        "vmov.i32   q14, #0\n\t"
+        "vmov.i32   q15, #0\n\t"
+        "1:\n\t"
+        "vld1.8     {d0-d1}, [%[x0]]!\n\t"
+        "vld1.8     {d2-d3}, [%[x1]]!\n\t"
+        "vld1.8     {d4-d5}, [%[w0]]!\n\t"
+        "vmull.s8   q3, d0, d4\n\t"
+        "vpadal.s16 q8, q3\n\t"
+        "vmull.s8   q3, d1, d5\n\t"
+        "vpadal.s16 q8, q3\n\t"
+        "vmull.s8   q3, d2, d4\n\t"
+        "vpadal.s16 q12, q3\n\t"
+        "vmull.s8   q3, d3, d5\n\t"
+        "vpadal.s16 q12, q3\n\t"
+        "vld1.8     {d4-d5}, [%[w1]]!\n\t"
+        "vmull.s8   q3, d0, d4\n\t"
+        "vpadal.s16 q9, q3\n\t"
+        "vmull.s8   q3, d1, d5\n\t"
+        "vpadal.s16 q9, q3\n\t"
+        "vmull.s8   q3, d2, d4\n\t"
+        "vpadal.s16 q13, q3\n\t"
+        "vmull.s8   q3, d3, d5\n\t"
+        "vpadal.s16 q13, q3\n\t"
+        "vld1.8     {d4-d5}, [%[w2]]!\n\t"
+        "vmull.s8   q3, d0, d4\n\t"
+        "vpadal.s16 q10, q3\n\t"
+        "vmull.s8   q3, d1, d5\n\t"
+        "vpadal.s16 q10, q3\n\t"
+        "vmull.s8   q3, d2, d4\n\t"
+        "vpadal.s16 q14, q3\n\t"
+        "vmull.s8   q3, d3, d5\n\t"
+        "vpadal.s16 q14, q3\n\t"
+        "vld1.8     {d4-d5}, [%[w3]]!\n\t"
+        "vmull.s8   q3, d0, d4\n\t"
+        "vpadal.s16 q11, q3\n\t"
+        "vmull.s8   q3, d1, d5\n\t"
+        "vpadal.s16 q11, q3\n\t"
+        "vmull.s8   q3, d2, d4\n\t"
+        "vpadal.s16 q15, q3\n\t"
+        "vmull.s8   q3, d3, d5\n\t"
+        "vpadal.s16 q15, q3\n\t"
+        "subs       %[n], %[n], #1\n\t"
+        "bne        1b\n\t"
+        "vpadd.i32  d16, d16, d17\n\t"
+        "vpadd.i32  d17, d18, d19\n\t"
+        "vpadd.i32  d18, d20, d21\n\t"
+        "vpadd.i32  d19, d22, d23\n\t"
+        "vpadd.i32  d16, d16, d17\n\t"
+        "vpadd.i32  d17, d18, d19\n\t"
+        "vst1.32    {d16-d17}, [%[o0]]\n\t"
+        "vpadd.i32  d24, d24, d25\n\t"
+        "vpadd.i32  d25, d26, d27\n\t"
+        "vpadd.i32  d26, d28, d29\n\t"
+        "vpadd.i32  d27, d30, d31\n\t"
+        "vpadd.i32  d24, d24, d25\n\t"
+        "vpadd.i32  d25, d26, d27\n\t"
+        "vst1.32    {d24-d25}, [%[o1]]\n\t"
+        : [x0] "+r"(x0), [x1] "+r"(x1), [w0] "+r"(w0), [w1] "+r"(w1), [w2] "+r"(w2), [w3] "+r"(w3), [n] "+r"(n16)
+        : [o0] "r"(o0), [o1] "r"(o1)
+        : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "d16", "d17", "d18", "d19", "d20", "d21", "d22", "d23",
+          "d24", "d25", "d26", "d27", "d28", "d29", "d30", "d31", "memory", "cc");
+}
+
 // acc[t*nb + j] = dot(x + t*ldq, W + j*kp): each activation vector is shared by four weight rows
 static void gemm_s8_xr_neon(const int8_t *W, int kp, int nb, const int8_t *x, int ldq, int T, int32_t *acc)
 {
     const int k16 = kp & ~15;
-    for (int t = 0; t < T; t++) {
+    int t0 = 0;
+    if (k16 == kp && nb >= 4)   // whole 16-byte rows: two positions per pass for the 4-wide weight blocks
+        for (; t0 + 2 <= T; t0 += 2) {
+            const int8_t *a0 = x + (size_t)t0 * ldq, *a1 = a0 + ldq;
+            int32_t *o0 = acc + (size_t)t0 * nb, *o1 = o0 + nb;
+            int j = 0;
+            for (; j + 4 <= nb; j += 4) {
+                const int8_t *w0 = W + (size_t)j * kp;
+                dot2x4_neon(a0, a1, w0, w0 + kp, w0 + 2 * kp, w0 + 3 * kp, k16 >> 4, o0 + j, o1 + j);
+            }
+            for (; j < nb; j++) {
+                const int8_t *w = W + (size_t)j * kp;
+                int32x4_t s0 = vdupq_n_s32(0), s1 = s0;
+                for (int i = 0; i < k16; i += 16) {
+                    const int8x16_t wv = vld1q_s8(w + i);
+                    s0 = mac16(s0, vld1q_s8(a0 + i), wv);
+                    s1 = mac16(s1, vld1q_s8(a1 + i), wv);
+                }
+                o0[j] = hsum(s0);
+                o1[j] = hsum(s1);
+            }
+        }
+    for (int t = t0; t < T; t++) {
         const int8_t *a = x + (size_t)t * ldq;
         int32_t *o = acc + (size_t)t * nb;
         int j = 0;
