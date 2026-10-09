@@ -4,7 +4,8 @@
 #
 #   host          host/          this machine's compiler (HOST_CC, default cc), portable C kernels
 #   host-profile  host-profile/  as host, plus TASR_PROFILE stage times and TASR_KERNEL_STATS shape counts
-#   jibo          jibo-scalar/   ARMv7 "plain": -mfpu=vfpv3-d16, hard float, portable C kernels (no NEON anywhere)
+#   jibo          jibo-scalar/   ARMv7 "plain": -mfpu=vfpv3-d16, hard float, no NEON anywhere; int8 kernels in
+#                                ARMv6 SIMD32 (sxtb16/smlad, kernels_neon.c); OIDO_KERNELS=scalar gives the C ones
 #   jibo-neon     jibo-neon/     ARMv7 with -mfpu=neon and the NEON kernels (ports/jibo/kernels_neon.c);
 #                                OIDO_KERNELS=scalar at run time switches the same binary to the C kernels
 #   jibo-profile  jibo-profile/  jibo-neon plus TASR_PROFILE and TASR_KERNEL_STATS
@@ -123,10 +124,10 @@ for target in "$@"; do
   case "$target" in
     host)         build "$B/host" "${HOST_CC:-cc}" "" "" ;;
     host-profile) build "$B/host-profile" "${HOST_CC:-cc}" "${DISPATCH[*]} ${PROFILE[*]}" "" dispatch ;;
-    jibo)         jibo_build "$B/jibo-scalar" "${ARCH_PLAIN[*]}" "" ;;
+    jibo)         jibo_build "$B/jibo-scalar" "${ARCH_PLAIN[*]} ${DISPATCH[*]} -DTASR_SIMD32" dispatch ;;
     jibo-neon)    jibo_build "$B/jibo-neon" "${ARCH_NEON[*]} ${DISPATCH[*]} -DTASR_NEON" dispatch ;;
     jibo-profile) jibo_build "$B/jibo-profile" "${ARCH_NEON[*]} ${DISPATCH[*]} -DTASR_NEON ${PROFILE[*]}" dispatch ;;
-    perf-plain)   jibo_build "$B/perf-plain" "${ARCH_PLAIN[*]} -DTASR_PROFILE" "" bench ;;
+    perf-plain)   jibo_build "$B/perf-plain" "${ARCH_PLAIN[*]} ${DISPATCH[*]} -DTASR_SIMD32 -DTASR_PROFILE" dispatch bench ;;
     perf-neon)    jibo_build "$B/perf-neon" "${ARCH_NEON[*]} ${DISPATCH[*]} -DTASR_NEON -DTASR_PROFILE" dispatch bench ;;
     all)          "$0" host host-profile jibo jibo-neon jibo-profile perf-plain perf-neon ;;
     *) echo "unknown target $target" >&2; exit 2 ;;

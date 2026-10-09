@@ -58,3 +58,4 @@ Instructions for the 5.76 s clip (millions). Every round passed the gate before 
 | Round | Change | plain utterance | plain stream | neon utterance | neon stream |
 |---|---|---|---|---|---|
 | r00 | baseline | 15,384.6 | 14,203.0 | 2,129.3 | 1,968.4 |
+| r01 | plain: ARMv6 SIMD32 int8 kernels (`sxtb16` + `smlad`, 4-row register blocking) | 6,495.9 (−57.8%) | 6,001.6 (−57.7%) | 2,129.3 | 1,968.4 |

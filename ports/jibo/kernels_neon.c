@@ -1,7 +1,9 @@
 // kernels_neon.c: the public int8 kernel names for Linux builds of the Oído engine, built with -DTASR_KERNEL_DISPATCH.
 //
-//   -DTASR_NEON          ARMv7 NEON versions of the int8 dot-product kernels (needs -mfpu=neon); otherwise every
-//                        call goes to the portable C version in kernels.c (now named *_scalar)
+//   -DTASR_NEON          ARMv7 NEON versions of the int8 dot-product kernels (needs -mfpu=neon)
+//   -DTASR_SIMD32        ARMv6/v7 SIMD32 versions (sxtb16 + smlad on core registers; no NEON, no VFP): for the
+//                        plain VFPv3-D16 build
+//   neither              every call goes to the portable C version in kernels.c (named *_scalar)
 //   -DTASR_KERNEL_STATS  count calls and multiply-accumulates per kernel and shape; tasr_kernel_stats_dump()
 //
 // Arithmetic: the NEON kernels compute the same int32 sums as the C ones, exactly. Each pair of int8 products is
@@ -26,6 +28,10 @@
 #error "-DTASR_NEON needs a NEON target (-mfpu=neon)"
 #endif
 #include <arm_neon.h>
+#elif defined(TASR_SIMD32)
+#if !defined(__arm__) || !defined(__ARM_ARCH) || __ARM_ARCH < 6
+#error "-DTASR_SIMD32 needs an ARMv6 or later 32-bit ARM target"
+#endif
 #endif
 
 int tasr_kernel_force_scalar;
@@ -34,6 +40,8 @@ const char *tasr_kernel_backend(void)
 {
 #ifdef TASR_NEON
     if (!tasr_kernel_force_scalar) return "neon";
+#elif defined(TASR_SIMD32)
+    if (!tasr_kernel_force_scalar) return "simd32";
 #endif
     return "scalar";
 }
@@ -207,12 +215,124 @@ static void dot48_rows_neon(const int8_t *q, const int8_t *x, int ldx, int T, in
 #define USE_NEON 0
 #endif
 
+// ------------------------------------------------------------------------------------------------ SIMD32 kernels
+#if defined(TASR_SIMD32) && !defined(TASR_NEON)
+// One 32-bit load brings four int8 values; sxtb16 sign-extends bytes 0 and 2 (and, rotated by 8, bytes 1 and 3) into
+// two 16-bit lanes, and smlad adds both 16 x 16 products to a 32-bit accumulator. All integer, so the sums are the C
+// kernels' sums exactly (smlad's Q flag only reports overflow, which the |sum| <= kp * 16384 bound rules out). The
+// accumulators are named scalars, not arrays, so they stay in registers; each loaded and widened word is shared by
+// four rows (register blocking).
+static inline uint32_t ld32(const int8_t *p) { uint32_t v; memcpy(&v, p, 4); return v; }
+static inline uint32_t sx02(uint32_t v) { uint32_t r; __asm__("sxtb16 %0, %1" : "=r"(r) : "r"(v)); return r; }
+static inline uint32_t sx13(uint32_t v) { uint32_t r; __asm__("sxtb16 %0, %1, ror #8" : "=r"(r) : "r"(v)); return r; }
+static inline int32_t smlad(uint32_t a, uint32_t b, int32_t acc)
+{
+    int32_t r;
+    __asm__("smlad %0, %1, %2, %3" : "=r"(r) : "r"(a), "r"(b), "r"(acc));
+    return r;
+}
+static inline int32_t tail_dot32(const int8_t *a, const int8_t *b, int from, int to)
+{
+    int32_t s = 0;
+    for (int i = from; i < to; i++) s += (int32_t)a[i] * (int32_t)b[i];
+    return s;
+}
+// acc + dot4(word a, word b)
+#define MAC4(acc, a, b) acc = smlad(sx13(a), sx13(b), smlad(sx02(a), sx02(b), acc))
+
+static void dot_rows_s8_simd32(const int8_t *w, const int8_t *x, int ldq, int T, int kp, int32_t *out)
+{
+    const int k4 = kp & ~3;
+    int t = 0;
+    for (; t + 4 <= T; t += 4) {   // four rows share each widened weight word
+        const int8_t *a0 = x + (size_t)t * ldq, *a1 = a0 + ldq, *a2 = a1 + ldq, *a3 = a2 + ldq;
+        int32_t s0 = 0, s1 = 0, s2 = 0, s3 = 0;
+        for (int i = 0; i < k4; i += 4) {
+            const uint32_t wv = ld32(w + i), w02 = sx02(wv), w13 = sx13(wv);
+            uint32_t v;
+            v = ld32(a0 + i); s0 = smlad(sx13(v), w13, smlad(sx02(v), w02, s0));
+            v = ld32(a1 + i); s1 = smlad(sx13(v), w13, smlad(sx02(v), w02, s1));
+            v = ld32(a2 + i); s2 = smlad(sx13(v), w13, smlad(sx02(v), w02, s2));
+            v = ld32(a3 + i); s3 = smlad(sx13(v), w13, smlad(sx02(v), w02, s3));
+        }
+        out[t] = s0 + tail_dot32(a0, w, k4, kp);
+        out[t + 1] = s1 + tail_dot32(a1, w, k4, kp);
+        out[t + 2] = s2 + tail_dot32(a2, w, k4, kp);
+        out[t + 3] = s3 + tail_dot32(a3, w, k4, kp);
+    }
+    for (; t < T; t++) {
+        const int8_t *a = x + (size_t)t * ldq;
+        int32_t s = 0;
+        for (int i = 0; i < k4; i += 4) MAC4(s, ld32(a + i), ld32(w + i));
+        out[t] = s + tail_dot32(a, w, k4, kp);
+    }
+}
+
+static void gemm_s8_xr_simd32(const int8_t *W, int kp, int nb, const int8_t *x, int ldq, int T, int32_t *acc)
+{
+    const int k4 = kp & ~3;
+    for (int t = 0; t < T; t++) {
+        const int8_t *a = x + (size_t)t * ldq;
+        int32_t *o = acc + (size_t)t * nb;
+        int j = 0;
+        for (; j + 4 <= nb; j += 4) {   // four weight rows share each widened activation word
+            const int8_t *w0 = W + (size_t)j * kp, *w1 = w0 + kp, *w2 = w1 + kp, *w3 = w2 + kp;
+            int32_t s0 = 0, s1 = 0, s2 = 0, s3 = 0;
+            for (int i = 0; i < k4; i += 4) {
+                const uint32_t av = ld32(a + i), a02 = sx02(av), a13 = sx13(av);
+                uint32_t v;
+                v = ld32(w0 + i); s0 = smlad(sx13(v), a13, smlad(sx02(v), a02, s0));
+                v = ld32(w1 + i); s1 = smlad(sx13(v), a13, smlad(sx02(v), a02, s1));
+                v = ld32(w2 + i); s2 = smlad(sx13(v), a13, smlad(sx02(v), a02, s2));
+                v = ld32(w3 + i); s3 = smlad(sx13(v), a13, smlad(sx02(v), a02, s3));
+            }
+            o[j] = s0 + tail_dot32(a, w0, k4, kp);
+            o[j + 1] = s1 + tail_dot32(a, w1, k4, kp);
+            o[j + 2] = s2 + tail_dot32(a, w2, k4, kp);
+            o[j + 3] = s3 + tail_dot32(a, w3, k4, kp);
+        }
+        for (; j < nb; j++) {
+            const int8_t *w = W + (size_t)j * kp;
+            int32_t s = 0;
+            for (int i = 0; i < k4; i += 4) MAC4(s, ld32(a + i), ld32(w + i));
+            o[j] = s + tail_dot32(a, w, k4, kp);
+        }
+    }
+}
+
+static void dot48_rows_simd32(const int8_t *q, const int8_t *x, int ldx, int T, int32_t *out)
+{
+    int t = 0;
+    for (; t + 2 <= T; t += 2) {   // two rows share each widened query word
+        const int8_t *a = x + (size_t)t * ldx, *b = a + ldx;
+        int32_t sa = 0, sb = 0;
+        for (int i = 0; i < 48; i += 4) {
+            const uint32_t qv = ld32(q + i), q02 = sx02(qv), q13 = sx13(qv);
+            uint32_t v;
+            v = ld32(a + i); sa = smlad(sx13(v), q13, smlad(sx02(v), q02, sa));
+            v = ld32(b + i); sb = smlad(sx13(v), q13, smlad(sx02(v), q02, sb));
+        }
+        out[t] = sa;
+        out[t + 1] = sb;
+    }
+    for (; t < T; t++) {
+        const int8_t *a = x + (size_t)t * ldx;
+        int32_t s = 0;
+        for (int i = 0; i < 48; i += 4) MAC4(s, ld32(a + i), ld32(q + i));
+        out[t] = s;
+    }
+}
+#define USE_SIMD32 (!tasr_kernel_force_scalar)
+#endif
+
 // ------------------------------------------------------------------------------------------------ public names
 void tasr_dot_rows_s8(const int8_t *w, const int8_t *x, int ldq, int T, int kp, int32_t *out)
 {
     KSTAT(0, kp, T, 1, ldq, (unsigned long long)T * kp);
 #ifdef TASR_NEON
     if (USE_NEON) { dot_rows_s8_neon(w, x, ldq, T, kp, out); return; }
+#elif defined(TASR_SIMD32)
+    if (USE_SIMD32) { dot_rows_s8_simd32(w, x, ldq, T, kp, out); return; }
 #endif
     tasr_dot_rows_s8_scalar(w, x, ldq, T, kp, out);
 }
@@ -222,6 +342,8 @@ void tasr_gemm_s8_xr(const int8_t *W, int kp, int nb, const int8_t *x, int ldq, 
     KSTAT(1, kp, T, nb, ldq, (unsigned long long)T * kp * nb);
 #ifdef TASR_NEON
     if (USE_NEON) { gemm_s8_xr_neon(W, kp, nb, x, ldq, T, acc); return; }
+#elif defined(TASR_SIMD32)
+    if (USE_SIMD32) { gemm_s8_xr_simd32(W, kp, nb, x, ldq, T, acc); return; }
 #endif
     tasr_gemm_s8_xr_scalar(W, kp, nb, x, ldq, T, acc);
 }
@@ -231,6 +353,8 @@ void tasr_dot48_rows(const int8_t *q, const int8_t *x, int ldx, int T, int32_t *
     KSTAT(2, 48, T, 1, ldx, (unsigned long long)T * 48);
 #ifdef TASR_NEON
     if (USE_NEON) { dot48_rows_neon(q, x, ldx, T, out); return; }
+#elif defined(TASR_SIMD32)
+    if (USE_SIMD32) { dot48_rows_simd32(q, x, ldx, T, out); return; }
 #endif
     tasr_dot48_rows_scalar(q, x, ldx, T, out);
 }
