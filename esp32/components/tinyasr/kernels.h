@@ -1,6 +1,7 @@
 #pragma once
 // Modified 2026-10-08/09 for the Jibo port (ports/jibo): optional TASR_KERNEL_DISPATCH renaming of the portable kernels
-// (int8 dot products and tasr_quant_rows); tasr_dot_rows2_s8 (two weight rows per call) used by tasr_qlin_range.
+// (int8 dot products and tasr_quant_rows); tasr_dot_rows2_s8 (two weight rows per call) used by tasr_qlin_range;
+// the activation-operand contract of the int8 kernels documented.
 #include <stdint.h>
 
 typedef struct {
@@ -10,6 +11,11 @@ typedef struct {
     const float *b;   // [n] bias
 } tasr_qlin_t;
 
+// CONTRACT for the int8 dot kernels below (tasr_dot_rows_s8, tasr_dot_rows2_s8, tasr_gemm_s8_xr, tasr_dot48_rows and
+// tasr_qlin/tasr_qlin_range): the operand named x (xq), the activations, holds values in [-127, 127]; the weight
+// operand (w, W, q) may be any int8. Every caller satisfies it: activations come from symmetric round-to-nearest
+// quantization (x * 127 / max|x|), which cannot give -128. SIMD versions rely on it to add two products in a 16-bit
+// lane (|2 * 127 * 128| < 2^15). Build with -DTASR_KERNEL_CHECKS to abort on a violation.
 // out[t] = dot(x + t*ldq, w) for t < T (kp multiple of 16, 16-byte aligned rows)
 void tasr_dot_rows_s8(const int8_t *w, const int8_t *x, int ldq, int T, int kp, int32_t *out);
 // two weight rows at once: out0[t] = dot(w0, x + t*ldq), out1[t] = dot(w1, x + t*ldq)
@@ -34,7 +40,8 @@ void tasr_dot48_rows(const int8_t *q, const int8_t *x, int ldx, int T, int32_t *
 
 #ifdef TASR_KERNEL_DISPATCH
 // Linux ports: the portable C kernels under their own names (kernels.c), the public names above dispatching to them
-// or to a SIMD version (ports/jibo/kernels_neon.c). Results are identical either way (exact int32 arithmetic).
+// or to a SIMD version (ports/jibo/kernels_neon.c). Results are identical either way (exact int32 arithmetic),
+// given the x-operand contract above.
 void tasr_dot_rows_s8_scalar(const int8_t *w, const int8_t *x, int ldq, int T, int kp, int32_t *out);
 void tasr_gemm_blk16_scalar(const int8_t *tile, int kp, const int8_t *x, int ldq, int T, int32_t *out);
 void tasr_gemm_s8_xr_scalar(const int8_t *W, int kp, int nb, const int8_t *x, int ldq, int T, int32_t *acc);

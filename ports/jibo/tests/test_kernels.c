@@ -1,5 +1,6 @@
 // test_kernels: the dispatched int8 kernels (NEON in a -DTASR_NEON build) against the portable C kernels, which must
-// agree exactly (int32), on:
+// agree exactly (int32), within the kernels.h contract (activations x in [-127, 127], weights any int8; "all -128"
+// below therefore means x = -127 against w = -128, the largest 16-bit pair sum the NEON kernels can see), on:
 //   - data: uniform random int8; all -128; all 127; -128 against 127; alternating extremes; zeros; random sparse
 //   - shapes: kp 16..1024 in steps of 16, the model's real ones (48, 176, 704, 1584, 3520, the long-row split's
 //     chunks) and kp not a multiple of 16 (the NEON tails); T 1..67 (remainders of the 4-row and 2-row unrolls);
@@ -56,6 +57,7 @@ static void test_shape(int kp, int T, int nb, int ldpad, int offset, int mode)
     const int ldq = kp + ldpad;
     int8_t *x = xbuf + offset, *w = wbuf + offset;
     fill(x, (size_t)T * ldq, mode, 0);
+    for (size_t i = 0; i < (size_t)T * ldq; i++) x[i] = x[i] == -128 ? -127 : x[i];  // x contract: [-127, 127]
     fill(w, (size_t)16 * kp + 48, mode, 1);
     tasr_dot_rows_s8(w, x, ldq, T, kp, o1);
     tasr_dot_rows_s8_scalar(w, x, ldq, T, kp, o2);

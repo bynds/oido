@@ -68,6 +68,7 @@ Instructions for the 5.76 s clip (millions). Every round passed the gate before 
 | r09 | neon: two weight rows × four positions per pass in the row-layout GEMMs (`tasr_dot_rows2_s8`) | 5,421.0 | 4,985.3 | 1,541.1 (−5.0%) | 1,408.6 (−5.5%) |
 | r10 | both: attention score dots (`dot48_rows`) through the 1 × 4 asm blocks | 5,366.3 (−1.0%) | 4,952.1 (−0.7%) | 1,537.9 (−0.2%) | 1,406.8 (−0.1%) |
 | r11 | neon: attention probabilities vectorised (scores, max, softmax indices, requantisation; gather and sum stay scalar, in order) | 5,366.3 | 4,952.1 | 1,504.2 (−2.2%) | 1,386.0 (−1.5%) |
+| r12 | neon: int8 product pairs added in 16-bit lanes (`vmull` + `vmlal`, then `vpadal`), exact under the activation contract in kernels.h | 5,366.3 | 4,952.1 | 1,322.3 (−12.1%) | 1,218.1 (−12.1%) |
 
 Rejected (measured, not committed as code): **r08** NEON SiLU with a per-lane table gather: `act` 79.3 → 89.0 M
 (+12.3%), NEON total +0.7%. Moving four indices to core registers, eight scalar table reads and reloading them into

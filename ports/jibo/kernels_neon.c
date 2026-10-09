@@ -13,6 +13,10 @@
 // kp < 131072. The model's longest row is 3520 (front-end projection). Only ARMv7 instructions are used (no SDOT,
 // no AArch64 across-vector adds). Unaligned rows are fine: vld1q_s8 has no alignment requirement on ARMv7.
 //
+// Since r12 the NEON kernels add the two products of each byte pair in a 16-bit lane before widening (vmull.s8 +
+// vmlal.s8, then vpadal.s16): exact under the x-operand contract in kernels.h (activations in [-127, 127]), because
+// then |a*b + c*d| <= 2 * 127 * 128 = 32512 < 32768. -DTASR_KERNEL_CHECKS checks the contract at every call.
+//
 // The int4 tile kernel (tasr_gemm_blk16, nemo4.tnm only) has no NEON version yet and always runs the C code.
 #include <math.h>
 #include <stdio.h>
@@ -142,31 +146,27 @@ static inline void dot1x4_neon(const int8_t *sv, const int8_t *p0, const int8_t 
         "vld1.8     {d2-d3}, [%[p0]]!\n\t"
         "vld1.8     {d4-d5}, [%[p1]]!\n\t"
         "vmull.s8   q12, d0, d2\n\t"
-        "vmull.s8   q13, d1, d3\n\t"
+        "vmlal.s8   q12, d1, d3\n\t"       // two products per 16-bit lane: |sum| <= 2 * 127 * 128 (KERNEL CONTRACT)
         "vld1.8     {d6-d7}, [%[p2]]!\n\t"
-        "vpadal.s16 q8, q12\n\t"
-        "vpadal.s16 q8, q13\n\t"
-        "vmull.s8   q14, d0, d4\n\t"
-        "vmull.s8   q15, d1, d5\n\t"
+        "vmull.s8   q13, d0, d4\n\t"
+        "vmlal.s8   q13, d1, d5\n\t"
         "vld1.8     {d2-d3}, [%[p3]]!\n\t"
-        "vpadal.s16 q9, q14\n\t"
-        "vpadal.s16 q9, q15\n\t"
-        "vmull.s8   q12, d0, d6\n\t"
-        "vmull.s8   q13, d1, d7\n\t"
-        "vpadal.s16 q10, q12\n\t"
-        "vpadal.s16 q10, q13\n\t"
-        "vmull.s8   q14, d0, d2\n\t"
-        "vmull.s8   q15, d1, d3\n\t"
-        "vpadal.s16 q11, q14\n\t"
+        "vpadal.s16 q8, q12\n\t"
+        "vmull.s8   q14, d0, d6\n\t"
+        "vmlal.s8   q14, d1, d7\n\t"
+        "vpadal.s16 q9, q13\n\t"
+        "vmull.s8   q15, d0, d2\n\t"
+        "vmlal.s8   q15, d1, d3\n\t"
+        "vpadal.s16 q10, q14\n\t"
         "vpadal.s16 q11, q15\n\t"
         "subs       %[n], %[n], #1\n\t"
         "bne        1b\n\t"
-        "vpadd.i32  d16, d16, d17\n\t"   // lane sums: [s0 s0'] ... then pairwise across accumulators
+        "vpadd.i32  d16, d16, d17\n\t"
         "vpadd.i32  d17, d18, d19\n\t"
         "vpadd.i32  d18, d20, d21\n\t"
         "vpadd.i32  d19, d22, d23\n\t"
-        "vpadd.i32  d16, d16, d17\n\t"   // [dot0 dot1]
-        "vpadd.i32  d17, d18, d19\n\t"   // [dot2 dot3]
+        "vpadd.i32  d16, d16, d17\n\t"
+        "vpadd.i32  d17, d18, d19\n\t"
         "vst1.32    {d16-d17}, [%[o]]\n\t"
         : [s] "+r"(sv), [p0] "+r"(p0), [p1] "+r"(p1), [p2] "+r"(p2), [p3] "+r"(p3), [n] "+r"(n16)
         : [o] "r"(out4)
@@ -217,39 +217,31 @@ static inline void dot2x4_neon(const int8_t *x0, const int8_t *x1, const int8_t 
         "vld1.8     {d2-d3}, [%[x1]]!\n\t"
         "vld1.8     {d4-d5}, [%[w0]]!\n\t"
         "vmull.s8   q3, d0, d4\n\t"
-        "vpadal.s16 q8, q3\n\t"
-        "vmull.s8   q3, d1, d5\n\t"
+        "vmlal.s8   q3, d1, d5\n\t"
         "vpadal.s16 q8, q3\n\t"
         "vmull.s8   q3, d2, d4\n\t"
-        "vpadal.s16 q12, q3\n\t"
-        "vmull.s8   q3, d3, d5\n\t"
+        "vmlal.s8   q3, d3, d5\n\t"
         "vpadal.s16 q12, q3\n\t"
         "vld1.8     {d4-d5}, [%[w1]]!\n\t"
         "vmull.s8   q3, d0, d4\n\t"
-        "vpadal.s16 q9, q3\n\t"
-        "vmull.s8   q3, d1, d5\n\t"
+        "vmlal.s8   q3, d1, d5\n\t"
         "vpadal.s16 q9, q3\n\t"
         "vmull.s8   q3, d2, d4\n\t"
-        "vpadal.s16 q13, q3\n\t"
-        "vmull.s8   q3, d3, d5\n\t"
+        "vmlal.s8   q3, d3, d5\n\t"
         "vpadal.s16 q13, q3\n\t"
         "vld1.8     {d4-d5}, [%[w2]]!\n\t"
         "vmull.s8   q3, d0, d4\n\t"
-        "vpadal.s16 q10, q3\n\t"
-        "vmull.s8   q3, d1, d5\n\t"
+        "vmlal.s8   q3, d1, d5\n\t"
         "vpadal.s16 q10, q3\n\t"
         "vmull.s8   q3, d2, d4\n\t"
-        "vpadal.s16 q14, q3\n\t"
-        "vmull.s8   q3, d3, d5\n\t"
+        "vmlal.s8   q3, d3, d5\n\t"
         "vpadal.s16 q14, q3\n\t"
         "vld1.8     {d4-d5}, [%[w3]]!\n\t"
         "vmull.s8   q3, d0, d4\n\t"
-        "vpadal.s16 q11, q3\n\t"
-        "vmull.s8   q3, d1, d5\n\t"
+        "vmlal.s8   q3, d1, d5\n\t"
         "vpadal.s16 q11, q3\n\t"
         "vmull.s8   q3, d2, d4\n\t"
-        "vpadal.s16 q15, q3\n\t"
-        "vmull.s8   q3, d3, d5\n\t"
+        "vmlal.s8   q3, d3, d5\n\t"
         "vpadal.s16 q15, q3\n\t"
         "subs       %[n], %[n], #1\n\t"
         "bne        1b\n\t"
@@ -583,9 +575,26 @@ static void dot48_rows_simd32(const int8_t *q, const int8_t *x, int ldx, int T, 
 #define USE_SIMD32 (!tasr_kernel_force_scalar)
 #endif
 
+// ------------------------------------------------------------------------------------------------ contract check
+#ifdef TASR_KERNEL_CHECKS
+static void check_x(const char *fn, const int8_t *x, int ld, int rows, int len)
+{
+    for (int r = 0; r < rows; r++)
+        for (int i = 0; i < len; i++)
+            if (x[(size_t)r * ld + i] == -128) {
+                fprintf(stderr, "%s: activation -128 at row %d, element %d (kernels.h contract)\n", fn, r, i);
+                abort();
+            }
+}
+#define CHECK_X(...) check_x(__VA_ARGS__)
+#else
+#define CHECK_X(...) ((void)0)
+#endif
+
 // ------------------------------------------------------------------------------------------------ public names
 void tasr_dot_rows_s8(const int8_t *w, const int8_t *x, int ldq, int T, int kp, int32_t *out)
 {
+    CHECK_X("tasr_dot_rows_s8", x, ldq, T, kp);
     KSTAT(0, kp, T, 1, ldq, (unsigned long long)T * kp);
 #ifdef TASR_NEON
     if (USE_NEON) { dot_rows_s8_neon(w, x, ldq, T, kp, out); return; }
@@ -597,6 +606,7 @@ void tasr_dot_rows_s8(const int8_t *w, const int8_t *x, int ldq, int T, int kp, 
 
 void tasr_gemm_s8_xr(const int8_t *W, int kp, int nb, const int8_t *x, int ldq, int T, int32_t *acc)
 {
+    CHECK_X("tasr_gemm_s8_xr", x, ldq, T, kp);
     KSTAT(1, kp, T, nb, ldq, (unsigned long long)T * kp * nb);
 #ifdef TASR_NEON
     if (USE_NEON) { gemm_s8_xr_neon(W, kp, nb, x, ldq, T, acc); return; }
@@ -609,6 +619,7 @@ void tasr_gemm_s8_xr(const int8_t *W, int kp, int nb, const int8_t *x, int ldq, 
 void tasr_dot_rows2_s8(const int8_t *w0, const int8_t *w1, const int8_t *x, int ldq, int T, int kp, int32_t *out0,
                        int32_t *out1)
 {
+    CHECK_X("tasr_dot_rows2_s8", x, ldq, T, kp);
 #ifdef TASR_NEON
     if (USE_NEON) {
         KSTAT(0, kp, T, 2, ldq, (unsigned long long)T * kp * 2);
@@ -621,6 +632,7 @@ void tasr_dot_rows2_s8(const int8_t *w0, const int8_t *w1, const int8_t *x, int 
 
 void tasr_dot48_rows(const int8_t *q, const int8_t *x, int ldx, int T, int32_t *out)
 {
+    CHECK_X("tasr_dot48_rows", x, ldx, T, 48);
     KSTAT(2, 48, T, 1, ldx, (unsigned long long)T * 48);
 #ifdef TASR_NEON
     if (USE_NEON) { dot48_rows_neon(q, x, ldx, T, out); return; }

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # build-jibo.sh [TARGET...]: builds of the Oído NeMo engine for the Jibo port. Targets (default: host jibo jibo-neon),
-# under $BUILD_ROOT (default build/; benches and gates set their own so they never share a build directory):
+# under $BUILD_ROOT (default build/; benches and gates set their own so they never share a build directory).
+# EXTRA_CFLAGS adds flags to every target (e.g. -DTASR_KERNEL_CHECKS: abort on a kernels.h contract violation):
 #
 #   host          host/          this machine's compiler (HOST_CC, default cc), portable C kernels
 #   host-profile  host-profile/  as host, plus TASR_PROFILE stage times and TASR_KERNEL_STATS shape counts
@@ -35,7 +36,7 @@ ENGINE=$ROOT/esp32/components/tinyasr
 ENGINE_SRC=("$ENGINE/tinyasr.c" "$ENGINE/kernels.c" "$ENGINE/tinyasr_lm.c" "$ENGINE/tasr_nemo.c" "$ENGINE/tasr_seg.c")
 FLAGS=(-O2 -std=c11 -D_DEFAULT_SOURCE -D_POSIX_C_SOURCE=200809L
        -ffp-contract=off -fno-fast-math -fno-tree-vectorize -DTASR_NO_SIMD
-       -I"$ENGINE/include" -I"$ENGINE" -I"$ROOT/ports/jibo" -Wall -Wno-unused-function)
+       -I"$ENGINE/include" -I"$ENGINE" -I"$ROOT/ports/jibo" -Wall -Wno-unused-function ${EXTRA_CFLAGS:-})
 ARCH_PLAIN=(-march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard)
 ARCH_NEON=(-march=armv7-a -mfpu=neon -mfloat-abi=hard)
 B=${BUILD_ROOT:-$ROOT/build}
