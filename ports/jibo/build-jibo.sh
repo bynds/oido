@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# build-jibo.sh [TARGET...]: builds of the Oído NeMo engine for the Jibo port. Targets (default: host jibo jibo-neon):
+# build-jibo.sh [TARGET...]: builds of the Oído NeMo engine for the Jibo port. Targets (default: host jibo jibo-neon),
+# under $BUILD_ROOT (default build/; benches and gates set their own so they never share a build directory):
 #
-#   host          build/host/          this machine's compiler (HOST_CC, default cc), portable C kernels
-#   host-profile  build/host-profile/  as host, plus TASR_PROFILE stage times and TASR_KERNEL_STATS shape counts
-#   jibo          build/jibo-scalar/   ARMv7 hard float, portable C kernels (the milestone-1 baseline binary)
-#   jibo-neon     build/jibo-neon/     ARMv7 with the NEON kernels (ports/jibo/kernels_neon.c); OIDO_KERNELS=scalar
-#                                      at run time switches the same binary to the C kernels
-#   jibo-profile  build/jibo-profile/  jibo-neon plus TASR_PROFILE and TASR_KERNEL_STATS
+#   host          host/          this machine's compiler (HOST_CC, default cc), portable C kernels
+#   host-profile  host-profile/  as host, plus TASR_PROFILE stage times and TASR_KERNEL_STATS shape counts
+#   jibo          jibo-scalar/   ARMv7 "plain": -mfpu=vfpv3-d16, hard float, portable C kernels (no NEON anywhere)
+#   jibo-neon     jibo-neon/     ARMv7 with -mfpu=neon and the NEON kernels (ports/jibo/kernels_neon.c);
+#                                OIDO_KERNELS=scalar at run time switches the same binary to the C kernels
+#   jibo-profile  jibo-profile/  jibo-neon plus TASR_PROFILE and TASR_KERNEL_STATS
+#   perf-plain    perf-plain/    perfvm/bench_engine for the plain variant, with TASR_PROFILE spans
+#   perf-neon     perf-neon/     perfvm/bench_engine for the NEON variant, with TASR_PROFILE spans
 #
 # Each target builds tasr_cli (upstream CLI; not in the dispatch targets), oido_cli, oido_stream_replay, oido_service,
 # oido_feed, oido_seg_ab,
@@ -32,18 +35,30 @@ ENGINE_SRC=("$ENGINE/tinyasr.c" "$ENGINE/kernels.c" "$ENGINE/tinyasr_lm.c" "$ENG
 FLAGS=(-O2 -std=c11 -D_DEFAULT_SOURCE -D_POSIX_C_SOURCE=200809L
        -ffp-contract=off -fno-fast-math -fno-tree-vectorize -DTASR_NO_SIMD
        -I"$ENGINE/include" -I"$ENGINE" -I"$ROOT/ports/jibo" -Wall -Wno-unused-function)
-ARCH=(-march=armv7-a -mfpu=neon -mfloat-abi=hard)
+ARCH_PLAIN=(-march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard)
+ARCH_NEON=(-march=armv7-a -mfpu=neon -mfloat-abi=hard)
+B=${BUILD_ROOT:-$ROOT/build}
 DISPATCH=(-DTASR_KERNEL_DISPATCH)
 PROFILE=(-DTASR_PROFILE -DTASR_KERNEL_STATS)
 
-# build OUT_DIR CC "cflags..." "ldflags..." [dispatch]
+# build OUT_DIR CC "cflags..." "ldflags..." [dispatch] [bench]
 build() {
-  local out=$1 cc=$2 cflags=$3 ldflags=$4 dispatch=${5:-}
+  local out=$1 cc=$2 cflags=$3 ldflags=$4 dispatch=${5:-} bench=${6:-}
   local -a cf lf src=("${ENGINE_SRC[@]}")
   read -r -a cf <<<"$cflags"
   read -r -a lf <<<"$ldflags"
   [ -n "$dispatch" ] && src+=("$ROOT/ports/jibo/kernels_neon.c")
   mkdir -p "$out"
+  if [ -n "$bench" ]; then   # perfvm programs only
+    rm -f "$out/bench_engine" "$out/selftest"
+    "$cc" "${FLAGS[@]}" "${cf[@]}" "$ROOT/ports/jibo/perfvm/bench_engine.c" "$ROOT/ports/jibo/port_util.c" "${src[@]}" \
+      "${lf[@]}" -lm -o "$out/bench_engine"
+    "$cc" "${FLAGS[@]}" "${cf[@]}" "$ROOT/ports/jibo/perfvm/selftest.c" "${lf[@]}" -o "$out/selftest"
+    { echo "compiler: $cc"; "$cc" --version | head -1; echo "flags: ${FLAGS[*]} ${cf[*]}"; echo "link: ${lf[*]} -lm"
+      echo "source: $(git -C "$ROOT" rev-parse HEAD)$(git -C "$ROOT" status --porcelain -- esp32 ports | grep -q . && echo ' (uncommitted changes)')"
+    } > "$out/BUILD-INFO.txt"
+    return
+  fi
   rm -f "$out/tasr_cli" "$out/oido_cli" "$out/oido_stream_replay" "$out/oido_service" "$out/oido_feed" "$out/oido_seg_ab" "$out/libm_fingerprint"
   [ -z "$dispatch" ] && "$cc" "${FLAGS[@]}" "${cf[@]}" "$ROOT/esp32/host/tasr_cli.c" "${src[@]}" "${lf[@]}" -lm -o "$out/tasr_cli"
   "$cc" "${FLAGS[@]}" "${cf[@]}" "$ROOT/ports/jibo/oido_cli.c" "$ROOT/ports/jibo/port_util.c" "${src[@]}" "${lf[@]}" -lm \
@@ -78,24 +93,25 @@ jibo_toolchain() {
   [ -n "$JIBO_COMPILER" ] && return
   if [ -n "${JIBO_CC:-}" ]; then
     JIBO_COMPILER=$JIBO_CC
-    JIBO_CF="${ARCH[*]}"
+    JIBO_CF=""
   elif [ -n "${JIBO_SYSROOT:-}" ]; then
     local R M=arm-linux-gnueabihf
     R=$(cd "$JIBO_SYSROOT" && pwd)
     JIBO_COMPILER=${JIBO_STANDIN_CC:-arm-linux-gnueabihf-gcc}
     # The host's cross gcc searches its own library directories before any --sysroot, so name the sysroot's
     # headers, start files and libraries explicitly (as the Decider port does).
-    JIBO_CF="${ARCH[*]} -nostdinc -isystem $("$JIBO_COMPILER" -print-file-name=include) -isystem $R/usr/include/$M -isystem $R/usr/include"
+    JIBO_CF="-nostdinc -isystem $("$JIBO_COMPILER" -print-file-name=include) -isystem $R/usr/include/$M -isystem $R/usr/include"
     JIBO_LF="-B$R/usr/lib/$M/ -L$R/usr/lib/$M -L$R/lib/$M -Wl,--sysroot=$R -Wl,-rpath-link,$R/lib/$M -static-libgcc"
   else
     echo "set JIBO_CC (the jibo-armcc wrapper) or JIBO_SYSROOT (a glibc <= 2.21 armhf sysroot)" >&2
     exit 2
   fi
 }
-jibo_build() {  # OUT extra-cflags dispatch
+jibo_build() {  # OUT extra-cflags (arch first) dispatch [bench]
   jibo_toolchain
-  build "$1" "$JIBO_COMPILER" "$JIBO_CF $2" "$JIBO_LF" "$3"
+  build "$1" "$JIBO_COMPILER" "$2 $JIBO_CF" "$JIBO_LF" "$3" "${4:-}"
   [ -n "${JIBO_SYSROOT:-}" ] && echo "sysroot: $(cd "$JIBO_SYSROOT" && pwd)" >> "$1/BUILD-INFO.txt"
+  if [ -n "${4:-}" ]; then "$ROOT/ports/jibo/check-jibo-abi.sh" "$1/bench_engine" "$1/selftest" | tee "$1/ABI-CHECK.txt"; return; fi
   local bins=("$1/oido_cli" "$1/oido_stream_replay" "$1/oido_service" "$1/oido_feed" "$1/oido_seg_ab" "$1/libm_fingerprint")
   [ -f "$1/tasr_cli" ] && bins+=("$1/tasr_cli")
   [ -f "$1/test_kernels" ] && bins+=("$1/test_kernels" "$1/bench_kernels")
@@ -105,12 +121,14 @@ jibo_build() {  # OUT extra-cflags dispatch
 [ $# -gt 0 ] || set -- host jibo jibo-neon
 for target in "$@"; do
   case "$target" in
-    host)         build "$ROOT/build/host" "${HOST_CC:-cc}" "" "" ;;
-    host-profile) build "$ROOT/build/host-profile" "${HOST_CC:-cc}" "${DISPATCH[*]} ${PROFILE[*]}" "" dispatch ;;
-    jibo)         jibo_build "$ROOT/build/jibo-scalar" "" "" ;;
-    jibo-neon)    jibo_build "$ROOT/build/jibo-neon" "${DISPATCH[*]} -DTASR_NEON" dispatch ;;
-    jibo-profile) jibo_build "$ROOT/build/jibo-profile" "${DISPATCH[*]} -DTASR_NEON ${PROFILE[*]}" dispatch ;;
-    all)          "$0" host host-profile jibo jibo-neon jibo-profile ;;
+    host)         build "$B/host" "${HOST_CC:-cc}" "" "" ;;
+    host-profile) build "$B/host-profile" "${HOST_CC:-cc}" "${DISPATCH[*]} ${PROFILE[*]}" "" dispatch ;;
+    jibo)         jibo_build "$B/jibo-scalar" "${ARCH_PLAIN[*]}" "" ;;
+    jibo-neon)    jibo_build "$B/jibo-neon" "${ARCH_NEON[*]} ${DISPATCH[*]} -DTASR_NEON" dispatch ;;
+    jibo-profile) jibo_build "$B/jibo-profile" "${ARCH_NEON[*]} ${DISPATCH[*]} -DTASR_NEON ${PROFILE[*]}" dispatch ;;
+    perf-plain)   jibo_build "$B/perf-plain" "${ARCH_PLAIN[*]} -DTASR_PROFILE" "" bench ;;
+    perf-neon)    jibo_build "$B/perf-neon" "${ARCH_NEON[*]} ${DISPATCH[*]} -DTASR_NEON -DTASR_PROFILE" dispatch bench ;;
+    all)          "$0" host host-profile jibo jibo-neon jibo-profile perf-plain perf-neon ;;
     *) echo "unknown target $target" >&2; exit 2 ;;
   esac
   echo "built $target"

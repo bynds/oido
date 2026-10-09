@@ -12,7 +12,8 @@
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 E=$ROOT/esp32/components/tinyasr
-OUT=$ROOT/build/tests
+B=${BUILD_ROOT:-$ROOT/build}   # binaries from build-jibo.sh (fixtures always come from build/fixtures)
+OUT=$B/tests
 mkdir -p "$OUT"
 CC=${HOST_CC:-cc}
 SAN=(-O1 -g -fsanitize=address,undefined -fno-sanitize-recover=undefined)
@@ -32,8 +33,8 @@ if [ -f "$ROOT/build/fixtures/real_23.wav" ]; then
   "$CC" "${SAN[@]}" "${FLAGS[@]}" -I"$ROOT/ports/jibo" "$ROOT/ports/jibo/tests/test_stream_lifecycle.c" \
     "$ROOT/ports/jibo/port_util.c" "${ENGINE[@]}" -lm -o "$OUT/test_stream_lifecycle"
   ASAN_OPTIONS=detect_leaks=0 "$OUT/test_stream_lifecycle" "$ROOT/models/oido_stream.tnm" "$ROOT/build/fixtures/real_23.wav" | tail -1
-  if [ -x "$ROOT/build/host/oido_service" ]; then
-    python3 "$ROOT/ports/jibo/tests/test_service.py" "$ROOT/build/host" | tail -1
+  if [ -x "$B/host/oido_service" ]; then
+    python3 "$ROOT/ports/jibo/tests/test_service.py" "$B/host" | tail -1
   else
     echo "test_service.py skipped (needs build-jibo.sh host)"
   fi
@@ -41,9 +42,9 @@ else
   echo "stream and service tests skipped (needs scripts/make-fixtures.sh)"
 fi
 
-if [ -x "$ROOT/build/jibo-neon/test_kernels" ] && command -v qemu-arm >/dev/null && [ -n "${JIBO_SYSROOT:-}" ]; then
+if [ -x "$B/jibo-neon/test_kernels" ] && command -v qemu-arm >/dev/null && [ -n "${JIBO_SYSROOT:-}" ]; then
   echo "ARM (qemu-arm, $JIBO_SYSROOT):"
-  qemu-arm -L "$JIBO_SYSROOT" "$ROOT/build/jibo-neon/test_kernels" | tail -3
+  qemu-arm -L "$JIBO_SYSROOT" "$B/jibo-neon/test_kernels" | tail -3
 else
   echo "ARM kernel test skipped (needs build/jibo-neon, qemu-arm and JIBO_SYSROOT)"
 fi

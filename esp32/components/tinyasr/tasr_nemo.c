@@ -1,8 +1,8 @@
 // tasr_nemo: utterance-level engine for NVIDIA NeMo Conformer-CTC small (rel-pos MHSA, full context), int8.
 // Mirrors train/nemo_small.py + train/nemo_eval.py (--bits 8 --att8) arithmetic.
 // Modified 2026-10-08 for the Jibo port (ports/jibo): loader header/bounds/alignment/size validation, allocation
-// checks in load and stream creation, NaN-safe lookup indices, stream truncation flag, 64-bit profiler timestamps
-// off the ESP32 and tasr_nemo_profile_reset. Arithmetic is unchanged.
+// checks in load and stream creation, NaN-safe lookup indices, stream truncation flag; profiler: 64-bit timestamps
+// off the ESP32, exclusive span accounting, call counts, a pluggable clock, reset. Arithmetic is unchanged.
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,30 +19,39 @@
 #define RB 64  // row block for position-wise sublayers
 
 #ifdef TASR_PROFILE
+// Stage spans. Each records exclusive cost (its own, minus spans nested in it) and a call count, so stage totals
+// add up without double counting. The clock is pluggable (tasr_nemo_profile_set_clock): CPU cycles on the ESP32,
+// monotonic nanoseconds elsewhere by default, or e.g. a PMU instruction count.
 #ifdef ESP_PLATFORM
 #include "esp_cpu.h"
-typedef uint32_t nts_t;  // CPU cycles; intervals are short enough for 32-bit differences
-static inline nts_t nts(void) { return esp_cpu_get_cycle_count(); }
+static uint64_t nclk_default(void) { return esp_cpu_get_cycle_count(); }
+#define NDIFF(a, b) ((uint32_t)((a) - (b)))  // 32-bit cycle counter: intervals are short enough
 #else
 #include <time.h>
-typedef uint64_t nts_t;  // nanoseconds: 32 bits would wrap within an interval of 4.29 s
-static inline nts_t nts(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec * 1000000000ull + t.tv_nsec; }
+static uint64_t nclk_default(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec * 1000000000ull + t.tv_nsec; }
+#define NDIFF(a, b) ((a) - (b))
 #endif
+static uint64_t (*nclk)(void) = nclk_default;
 enum { N_FEAT, N_CONV0, N_IM2COL, N_CONV2, N_SUB, N_LN, N_GEMM, N_QUANT, N_ACT, N_QKV8, N_POS, N_ATT, N_DW, N_HEAD, N_NP };
 static const char *nprof_names[N_NP] = {"features", "conv0", "im2col", "gemm_fe", "gemm_k704", "layernorm", "gemm", "quant",
                                         "act", "qkv_int8", "pos", "attention", "dwconv", "head+dec"};
-static uint64_t nprof[N_NP];
-#define NB(v) nts_t v = nts()
-#define NE(v, c) nprof[c] += (nts_t)(nts() - v)
+static uint64_t nprof[N_NP], ncalls[N_NP], nchild;  // nchild: cost of spans nested in the one now open
+typedef struct { uint64_t t0, child; } nspan_t;
+#define NB(v) nspan_t v = {nclk(), nchild}; nchild = 0
+#define NE(v, c) do { const uint64_t el_ = NDIFF(nclk(), v.t0); nprof[c] += el_ - nchild; ncalls[c]++; nchild = v.child + el_; } while (0)
 const char *tasr_nemo_profile_name(int i) { return i < N_NP ? nprof_names[i] : 0; }
 uint64_t tasr_nemo_profile_value(int i) { return i < N_NP ? nprof[i] : 0; }
-void tasr_nemo_profile_reset(void) { memset(nprof, 0, sizeof(nprof)); }
+uint64_t tasr_nemo_profile_calls(int i) { return i < N_NP ? ncalls[i] : 0; }
+void tasr_nemo_profile_reset(void) { memset(nprof, 0, sizeof(nprof)); memset(ncalls, 0, sizeof(ncalls)); nchild = 0; }
+void tasr_nemo_profile_set_clock(uint64_t (*clk)(void)) { nclk = clk ? clk : nclk_default; }
 #else
 #define NB(v)
 #define NE(v, c)
 const char *tasr_nemo_profile_name(int i) { (void)i; return 0; }
 uint64_t tasr_nemo_profile_value(int i) { (void)i; return 0; }
+uint64_t tasr_nemo_profile_calls(int i) { (void)i; return 0; }
 void tasr_nemo_profile_reset(void) {}
+void tasr_nemo_profile_set_clock(uint64_t (*clk)(void)) { (void)clk; }
 #endif
 
 typedef struct {

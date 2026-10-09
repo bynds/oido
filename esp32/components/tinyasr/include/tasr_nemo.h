@@ -1,6 +1,6 @@
 // Utterance-level engine for NVIDIA NeMo Conformer-CTC small (13 M params, int8) — higher-accuracy mode.
-// Modified 2026-10-08 for the Jibo port (ports/jibo): load contract documented; tasr_nemo_stream_truncated and
-// tasr_nemo_profile_reset added.
+// Modified 2026-10-08 for the Jibo port (ports/jibo): load contract documented; tasr_nemo_stream_truncated,
+// tasr_nemo_profile_reset, _calls and _set_clock added.
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
@@ -44,11 +44,15 @@ int tasr_nemo_stream_supported(const tasr_nemo_t *m);
 // maxlen was too small (the beam decoder path does not report this)
 int tasr_nemo_stream_truncated(const tasr_nemo_stream_t *s);
 
-// profiling (TASR_PROFILE builds): per-stage totals, CPU cycles on the ESP32, nanoseconds elsewhere; NULL name ends
-// the list. tasr_nemo_profile_reset zeroes them (the generic engine's tasr_profile_reset does not).
+// profiling (TASR_PROFILE builds; no-ops otherwise): per-stage exclusive totals (a stage's own cost, not that of
+// stages nested in it) and call counts, in the clock's units: CPU cycles on the ESP32, nanoseconds elsewhere, or
+// whatever tasr_nemo_profile_set_clock installs (NULL restores the default). NULL name ends the list.
+// tasr_nemo_profile_reset zeroes them (the generic engine's tasr_profile_reset does not).
 const char *tasr_nemo_profile_name(int i);
 uint64_t tasr_nemo_profile_value(int i);
+uint64_t tasr_nemo_profile_calls(int i);
 void tasr_nemo_profile_reset(void);
+void tasr_nemo_profile_set_clock(uint64_t (*clk)(void));
 
 #ifdef __cplusplus
 }
