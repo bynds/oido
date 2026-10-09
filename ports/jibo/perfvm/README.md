@@ -64,3 +64,4 @@ Instructions for the 5.76 s clip (millions). Every round passed the gate before 
 | r04 | plain: hand SIMD32 asm for the 4-row block (14 values in core registers, 25 instr per 16 MACs) | 5,424.0 (−16.5%) | 4,988.2 (−16.9%) | 1,745.5 | 1,604.0 |
 | r05 | neon: two positions × four weight rows per pass in `gemm_s8_xr` (asm, 8 accumulators) | 5,424.0 | 4,988.2 | 1,663.9 (−4.7%) | 1,531.9 (−4.5%) |
 | r06 | neon: depthwise convolution with channels in NEON lanes (2 frames × 8 channels per pass) | 5,424.0 | 4,988.2 | 1,639.3 (−1.5%) | 1,507.3 (−1.6%) |
+| r07 | neon: first convolution (conv0) with frequency positions in lanes (`vld2` taps, masked ReLU, bit-pattern max) | 5,424.0 | 4,988.2 | 1,622.4 (−1.0%) | 1,490.3 (−1.1%) |

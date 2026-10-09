@@ -661,6 +661,29 @@ typedef struct {
     float *out;                  // [sc][f1 + 2] (zero column on both sides for the next conv)
     float *cmw;                  // [NW][f1 + 2] per-worker max over its channels of each output column
 } nc0_t;
+#ifdef NNEON
+// One channel, four frequency positions per vector. Each lane is one output built exactly as in C: bias, then
+// + w_k * tap_k for k = 0..8 (vmul, vadd: separately rounded, never fused). The stride-2 taps come from vld2
+// (even/odd split). ReLU as `acc > 0 ? acc : 0` with vcgt and a bitwise and (NaN and -0 give +0, as in C); the
+// running column max over these non-negative, non-NaN values is an unsigned max of their bit patterns, which orders
+// them exactly as `v > m ? v : m` does. f1 % 4 == 0 (40); the last vld2 reads P[r][81], inside the row.
+static void nc0_chan_neon(const float (*P)[NMEL + 2], const float *wt, float bias, int f1, float *o, float *cm)
+{
+    const float32x4_t zero = vdupq_n_f32(0.f);
+    for (int f = 0; f < f1; f += 4) {
+        float32x4_t acc = vdupq_n_f32(bias);
+        for (int r = 0; r < 3; r++) {
+            const float32x4x2_t a = vld2q_f32(&P[r][2 * f]), c = vld2q_f32(&P[r][2 * f + 2]);
+            acc = vaddq_f32(acc, vmulq_n_f32(a.val[0], wt[3 * r]));
+            acc = vaddq_f32(acc, vmulq_n_f32(a.val[1], wt[3 * r + 1]));
+            acc = vaddq_f32(acc, vmulq_n_f32(c.val[0], wt[3 * r + 2]));
+        }
+        const uint32x4_t v = vandq_u32(vreinterpretq_u32_f32(acc), vcgtq_f32(acc, zero));
+        vst1q_f32(o + 1 + f, vreinterpretq_f32_u32(v));
+        vst1q_u32((uint32_t *)(cm + 1 + f), vmaxq_u32(v, vld1q_u32((const uint32_t *)(cm + 1 + f))));
+    }
+}
+#endif
 static void nc0_job(void *p, int b, int e, int w)
 {
     nc0_t *j = (nc0_t *)p;
@@ -668,6 +691,17 @@ static void nc0_job(void *p, int b, int e, int w)
     const int f1 = m->f1;
     float *cm = j->cmw + (size_t)w * (f1 + 2);
     for (int f = 0; f < f1 + 2; f++) cm[f] = 0.f;
+#ifdef NNEON
+    if (NNEON && f1 % 4 == 0) {
+        for (int ch = b; ch < e; ch++) {
+            float *o = j->out + (size_t)ch * (f1 + 2);
+            o[0] = 0.f;
+            o[f1 + 1] = 0.f;
+            nc0_chan_neon(j->P, m->c0_w + ch * 9, m->c0_b[ch], f1, o, cm);
+        }
+        return;
+    }
+#endif
     for (int ch = b; ch < e; ch++) {
         const float *wt = m->c0_w + ch * 9;
         const float w0 = wt[0], w1 = wt[1], w2 = wt[2], w3 = wt[3], w4 = wt[4], w5 = wt[5], w6 = wt[6], w7 = wt[7], w8 = wt[8];
