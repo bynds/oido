@@ -73,3 +73,8 @@ Instructions for the 5.76 s clip (millions). Every round passed the gate before 
 Rejected (measured, not committed as code): **r08** NEON SiLU with a per-lane table gather: `act` 79.3 → 89.0 M
 (+12.3%), NEON total +0.7%. Moving four indices to core registers, eight scalar table reads and reloading them into
 lanes cost more than the vector arithmetic saved (`results/r08-neon-silu-rejected.jsonl`).
+
+**r13** plain: `tasr_quant_rows` max on integer bit patterns, four running maxima, with an explicit NaN skip (to keep C's
+"NaN never selected"): `quant` 106.8 → 115.1 M (+7.8%), plain total +0.2%. The NaN filter costs more than the VFP
+compare-and-transfer it replaces; without it the result would differ for NaN inputs, so it is not an option
+(`results/r13-plain-quant-rejected.jsonl`).
