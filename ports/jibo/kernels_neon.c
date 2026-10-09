@@ -14,6 +14,7 @@
 // no AArch64 across-vector adds). Unaligned rows are fine: vld1q_s8 has no alignment requirement on ARMv7.
 //
 // The int4 tile kernel (tasr_gemm_blk16, nemo4.tnm only) has no NEON version yet and always runs the C code.
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -249,6 +250,63 @@ static void dot48_rows_neon(const int8_t *q, const int8_t *x, int ldx, int T, in
         out[t] = hsum(s);
     }
 }
+// Dynamic per-row int8 quantization (tasr_quant_rows), 8 values per step. Bit-identical to the C version:
+//  - max |x|: vcgt + vbsl per lane is the C loop's `a > m ? a : m` (a NaN is never selected, as in C); a maximum
+//    does not depend on order; under NEON's flush-to-zero a subnormal |x| compares as 0, which only matters when
+//    every |x| is below 1e-30, where both versions clamp m to 1e-30;
+//  - q = rne(x * inv): vmul.f32, then + 1.5 * 2^23 and - 1.5 * 2^23 as separate round-to-nearest operations, never
+//    fused (as the C code with -ffp-contract=off); the result is an exact integer in [-127, 127], so vcvt's
+//    truncation and the two narrowing moves are exact. A flushed subnormal x or product would round to 0 anyway
+//    (|x * inv| < 2^-125 * 1.27e32 < 0.5).
+static void quant_rows_neon(const float *x, int T, int K, int ldx, int8_t *xq, int ldq, int kp, float *xs)
+{
+    const int K4 = K & ~3, K8 = K & ~7;
+    const float32x4_t magic = vdupq_n_f32(12582912.0f);
+    for (int t = 0; t < T; t++) {
+        const float *r = x + (size_t)t * ldx;
+        int8_t *q = xq + (size_t)t * ldq;
+        // per-lane running max in asm: GCC turned the vcgtq/vbslq intrinsics back into scalar vcmpe per lane
+        float lanes[4] = {0.f, 0.f, 0.f, 0.f}, m = 0.f;
+        if (K4) {
+            const float *rp = r;
+            int n4 = K4 >> 2;
+            __asm__ volatile(
+                "vmov.i32   q8, #0\n\t"
+                "1:\n\t"
+                "vld1.32    {d0-d1}, [%[r]]!\n\t"
+                "vabs.f32   q0, q0\n\t"
+                "vcgt.f32   q1, q0, q8\n\t"   // lanes where |x| > running max (false for NaN, as in C)
+                "vbit       q8, q0, q1\n\t"
+                "subs       %[n], %[n], #1\n\t"
+                "bne        1b\n\t"
+                "vst1.32    {d16-d17}, [%[o]]\n\t"
+                : [r] "+r"(rp), [n] "+r"(n4)
+                : [o] "r"(lanes)
+                : "d0", "d1", "d2", "d3", "d16", "d17", "memory", "cc");
+        }
+        for (int i = 0; i < 4; i++) m = lanes[i] > m ? lanes[i] : m;
+        for (int k = K4; k < K; k++) {
+            const float a = fabsf(r[k]);
+            m = a > m ? a : m;
+        }
+        if (m < 1e-30f) m = 1e-30f;
+        const float inv = 127.0f / m;
+        const float32x4_t vinv = vdupq_n_f32(inv);
+        int k = 0;
+        for (; k < K8; k += 8) {
+            const float32x4_t y0 = vsubq_f32(vaddq_f32(vmulq_f32(vld1q_f32(r + k), vinv), magic), magic);
+            const float32x4_t y1 = vsubq_f32(vaddq_f32(vmulq_f32(vld1q_f32(r + k + 4), vinv), magic), magic);
+            const int16x8_t h = vcombine_s16(vmovn_s32(vcvtq_s32_f32(y0)), vmovn_s32(vcvtq_s32_f32(y1)));
+            vst1_s8(q + k, vmovn_s16(h));
+        }
+        for (; k < K; k++) {
+            const float y = r[k] * inv + 12582912.0f;
+            q[k] = (int8_t)(int)(y - 12582912.0f);
+        }
+        for (k = K; k < kp; k++) q[k] = 0;
+        xs[t] = m / 127.0f;
+    }
+}
 #define USE_NEON (!tasr_kernel_force_scalar)
 #else
 #define USE_NEON 0
@@ -396,6 +454,14 @@ void tasr_dot48_rows(const int8_t *q, const int8_t *x, int ldx, int T, int32_t *
     if (USE_SIMD32) { dot48_rows_simd32(q, x, ldx, T, out); return; }
 #endif
     tasr_dot48_rows_scalar(q, x, ldx, T, out);
+}
+
+void tasr_quant_rows(const float *x, int T, int K, int ldx, int8_t *xq, int ldq, int kp, float *xs)
+{
+#ifdef TASR_NEON
+    if (USE_NEON) { quant_rows_neon(x, T, K, ldx, xq, ldq, kp, xs); return; }
+#endif
+    tasr_quant_rows_scalar(x, T, K, ldx, xq, ldq, kp, xs);
 }
 
 void tasr_gemm_blk16(const int8_t *tile, int kp, const int8_t *x, int ldq, int T, int32_t *out)

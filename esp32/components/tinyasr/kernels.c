@@ -1,5 +1,6 @@
 #include "kernels.h"
-// Modified 2026-10-08 for the Jibo port (ports/jibo): optional TASR_KERNEL_DISPATCH renaming of the portable kernels.
+// Modified 2026-10-08/09 for the Jibo port (ports/jibo): optional TASR_KERNEL_DISPATCH renaming of the portable kernels
+// (int8 dot products and tasr_quant_rows).
 #include <math.h>
 #include <string.h>
 
@@ -125,7 +126,7 @@ void tasr_unpack_s4(const uint8_t *src, int8_t *dst, int kp)
 }
 #endif
 
-void tasr_quant_rows(const float *x, int T, int K, int ldx, int8_t *xq, int ldq, int kp, float *xs)
+void KSCALAR(tasr_quant_rows)(const float *x, int T, int K, int ldx, int8_t *xq, int ldq, int kp, float *xs)
 {
     for (int t = 0; t < T; t++) {
         const float *r = x + (size_t)t * ldx;

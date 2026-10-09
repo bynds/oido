@@ -113,6 +113,46 @@ static void test_qlin(int n, int k, int bits, int T)
     free(w); free(s); free(b); free(xq); free(xsc); free(y1); free(y2); free(wtmp); free(acc);
 }
 
+// tasr_quant_rows, dispatched vs C: int8 rows and scales must be bit-identical. Rows of random magnitudes, exact
+// rounding ties (x * inv landing on n + 0.5), subnormals, all zeros, one huge value, negative zero, and K not a
+// multiple of 8 or 4.
+static void test_quant(void)
+{
+    static float x[64 * 720];
+    static int8_t q1[64 * 736], q2[64 * 736];
+    float s1[64], s2[64];
+    const int Ks[] = {176, 704, 1584 / 9, 3, 5, 9, 15, 44, 1};
+    for (size_t ki = 0; ki < sizeof(Ks) / sizeof(Ks[0]); ki++)
+        for (int mode = 0; mode < 6; mode++) {
+            const int K = Ks[ki], kp = (K + 15) & ~15, T = 1 + (int)(xs32() % 64);
+            for (int t = 0; t < T; t++) {
+                const float scale = mode == 0 ? (float)(xs32() % 1000) * 1e-3f : 1.0f;
+                for (int k = 0; k < K; k++) {
+                    float v;
+                    switch (mode) {
+                    case 0: v = ((int)(xs32() % 20001) - 10000) * 1e-4f * scale; break;
+                    case 1: v = ((int)(xs32() % 255) - 127) * 0.5f + (k == 0 ? 63.5f : 0.f); break;  // ties after scaling
+                    case 2: v = ((int)(xs32() % 3) - 1) * 1e-40f; break;                          // subnormals
+                    case 3: v = k == (int)(xs32() % K) ? 3e38f : ((int)(xs32() % 2001) - 1000) * 1e-3f; break;
+                    case 4: v = (xs32() & 1) ? -0.0f : 0.0f; break;
+                    default: v = ((int)(xs32() % 2001) - 1000) * 1e-36f; break;               // near the 1e-30 clamp
+                    }
+                    x[(size_t)t * K + k] = v;
+                }
+            }
+            memset(q1, 0x55, sizeof(q1)); memset(q2, 0x55, sizeof(q2));
+            tasr_kernel_force_scalar = 0;
+            tasr_quant_rows(x, T, K, K, q1, kp, kp, s1);
+            tasr_kernel_force_scalar = 1;
+            tasr_quant_rows(x, T, K, K, q2, kp, kp, s2);
+            tasr_kernel_force_scalar = 0;
+            checks++;
+            if (memcmp(q1, q2, (size_t)T * kp) || memcmp(s1, s2, sizeof(float) * T)) {
+                if (bad++ < 20) printf("MISMATCH quant_rows K %d T %d mode %d\n", K, T, mode);
+            }
+        }
+}
+
 int main(void)
 {
     printf("backend: %s\n", tasr_kernel_backend());
@@ -145,6 +185,7 @@ int main(void)
     test_qlin(704, 176, 4, 40);    // int4 blocked (n % 16 == 0)
     test_qlin(170, 176, 4, 40);    // int4 row layout
     test_qlin(176, 704, 4, 64);    // int4 row layout, longer rows
+    test_quant();
     printf("%ld comparisons, %ld mismatches\n%s\n", checks, bad, bad ? "FAILED" : "ok");
     return bad ? 1 : 0;
 }
