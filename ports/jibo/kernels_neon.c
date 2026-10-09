@@ -352,6 +352,10 @@ static void dot48_rows_neon(const int8_t *q, const int8_t *x, int ldx, int T, in
 {
     const int8x16_t q0 = vld1q_s8(q), q1 = vld1q_s8(q + 16), q2 = vld1q_s8(q + 32);
     int t = 0;
+    for (; t + 4 <= T; t += 4) {   // the query against four key rows: the 1 x 4 asm block, three 16-byte steps
+        const int8_t *a = x + (size_t)t * ldx;
+        dot1x4_neon(q, a, a + ldx, a + 2 * (size_t)ldx, a + 3 * (size_t)ldx, 3, out + t);
+    }
     for (; t + 2 <= T; t += 2) {
         const int8_t *a = x + (size_t)t * ldx, *b = a + ldx;
         int32x4_t sa = vdupq_n_s32(0), sb = sa;
@@ -553,6 +557,10 @@ static void gemm_s8_xr_simd32(const int8_t *W, int kp, int nb, const int8_t *x, 
 static void dot48_rows_simd32(const int8_t *q, const int8_t *x, int ldx, int T, int32_t *out)
 {
     int t = 0;
+    for (; t + 4 <= T; t += 4) {   // the query against four key rows: the 1 x 4 asm block, twelve 4-byte steps
+        const int8_t *a = x + (size_t)t * ldx;
+        dot1x4_simd32(q, a, a + ldx, a + 2 * (size_t)ldx, a + 3 * (size_t)ldx, 12, out + t);
+    }
     for (; t + 2 <= T; t += 2) {   // two rows share each widened query word
         const int8_t *a = x + (size_t)t * ldx, *b = a + ldx;
         int32_t sa = 0, sb = 0;
