@@ -2,12 +2,17 @@
 // Mirrors train/nemo_small.py + train/nemo_eval.py (--bits 8 --att8) arithmetic.
 // Modified 2026-10-08 for the Jibo port (ports/jibo): loader header/bounds/alignment/size validation, allocation
 // checks in load and stream creation, NaN-safe lookup indices, stream truncation flag; profiler: 64-bit timestamps
-// off the ESP32, exclusive span accounting, call counts, a pluggable clock, reset. Arithmetic is unchanged.
+// off the ESP32, exclusive span accounting, call counts, a pluggable clock, reset. 2026-10-09: NEON float paths
+// (TASR_NEON with the dispatch layer) computing the same per-element operations in the same order. Results unchanged.
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include "kernels.h"
 #include "tasr_nemo.h"
+#if defined(TASR_NEON) && defined(TASR_KERNEL_DISPATCH)
+#include <arm_neon.h>
+#define NNEON (!tasr_kernel_force_scalar)  // vector float paths below; OIDO_KERNELS=scalar restores the C ones
+#endif
 #include "tinyasr.h"
 #include "tinyasr_lm.h"
 
@@ -481,12 +486,45 @@ typedef struct {
     const nlayer_t *L;
     int T, d, k;
 } ndw_t;
+#ifdef NNEON
+// Two frames x eight channels per pass with channels in NEON lanes: each lane is one channel's sum, built in the C
+// code's order (bias, then + w_k * x_k for k ascending, vmul then vadd: rounded product, rounded sum, never fused),
+// so every output equals the C loop's. d % 8 == 0 (176).
+static void ndw_rows_neon(const ndw_t *j, int t)
+{
+    const int d = j->d;
+    float *o = j->out + (size_t)t * d, *o2 = o + d;
+    const float *xin = j->in + (size_t)t * d;
+    for (int ch = 0; ch < d; ch += 8) {
+        float32x4_t a0 = vld1q_f32(j->L->dw_b + ch), a1 = vld1q_f32(j->L->dw_b + ch + 4), c0 = a0, c1 = a1;
+        const float *wt = j->L->dw_wt + ch, *x = xin + ch;
+        for (int kk = 0; kk < j->k; kk++, wt += d, x += d) {
+            const float32x4_t w0 = vld1q_f32(wt), w1 = vld1q_f32(wt + 4);
+            a0 = vaddq_f32(a0, vmulq_f32(w0, vld1q_f32(x)));
+            a1 = vaddq_f32(a1, vmulq_f32(w1, vld1q_f32(x + 4)));
+            c0 = vaddq_f32(c0, vmulq_f32(w0, vld1q_f32(x + d)));
+            c1 = vaddq_f32(c1, vmulq_f32(w1, vld1q_f32(x + d + 4)));
+        }
+        vst1q_f32(o + ch, a0); vst1q_f32(o + ch + 4, a1);
+        vst1q_f32(o2 + ch, c0); vst1q_f32(o2 + ch + 4, c1);
+    }
+}
+#endif
 static void ndw_job(void *p, int b, int e, int w)
 {
     (void)w;
     ndw_t *j = (ndw_t *)p;
     const int d = j->d;
     int t = b;
+#ifdef NNEON
+    if (NNEON && d % 8 == 0)
+        for (; t + 1 < e; t += 2) {
+            ndw_rows_neon(j, t);
+            float *o = j->out + (size_t)t * d, *o2 = o + d;
+            for (int ch = 0; ch < d; ch++) o[ch] = o[ch] * nsig(o[ch]);
+            for (int ch = 0; ch < d; ch++) o2[ch] = o2[ch] * nsig(o2[ch]);
+        }
+#endif
     for (; t + 1 < e; t += 2) {  // two frames per pass: each weight load feeds both (same summation order per output)
         float *o = j->out + (size_t)t * d, *o2 = o + d;
         const float *xin = j->in + (size_t)t * d;
