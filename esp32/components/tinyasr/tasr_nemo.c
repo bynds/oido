@@ -339,6 +339,98 @@ static inline float nsig(float x)
 #define NEXP_STEPS 64
 #define NEXP_N (20 * NEXP_STEPS)
 static float nexp_tab[NEXP_N];
+#ifdef NNEON
+// running max with C's `a > m ? a : m` per lane (a NaN is never selected); asm because GCC turns the vcgtq/vbslq
+// intrinsics back into one scalar compare per lane
+static inline float32x4_t nmax_lanes(float32x4_t m, float32x4_t a)
+{
+    uint32x4_t t;
+    __asm__("vcgt.f32 %q[t], %q[a], %q[m]\n\tvbit %q[m], %q[a], %q[t]" : [t] "=&w"(t), [m] "+w"(m) : [a] "w"(a));
+    return m;
+}
+// One attention row's probabilities, as the C loops in natt_job/satt_job compute them, four keys per vector:
+//  scores  a = ((float)ia * A) * sk + ((float)ib * B) * spm: the same four rounded products and one rounded sum;
+//          the max over keys does not depend on order (a +-0 tie gives the same mx64 = 0.5 either way)
+//  softmax ix = (int)(mx64 - a * 64) vectorized (exact * 64, one rounded subtraction, truncation); the table read
+//          and the running sum stay scalar and in key order, so the sum is the C sum
+//  p2 = ex * sv, and its max (non-negative values: an unsigned max of the bit patterns orders them as C does)
+//  requantization as tasr_quant_rows: + and - 1.5 * 2^23, separately rounded
+// Writes pq[0..n) and returns sum and pm (before the 1e-30 floor, which the caller applies as before).
+static void natt_probs_neon(const int32_t *ia, const int32_t *ib, float A, float B, const float *sk, const float *spm,
+                            const float *sv, int n, float *sc, int8_t *pq, float *sum_out, float *pm_out)
+{
+    const int n4 = n & ~3;
+    const float32x4_t vA = vdupq_n_f32(A), vB = vdupq_n_f32(B);
+    float32x4_t vmx = vdupq_n_f32(-1e30f);
+    for (int k = 0; k < n4; k += 4) {
+        const float32x4_t a = vaddq_f32(vmulq_f32(vmulq_f32(vcvtq_f32_s32(vld1q_s32(ia + k)), vA), vld1q_f32(sk + k)),
+                                        vmulq_f32(vmulq_f32(vcvtq_f32_s32(vld1q_s32(ib + k)), vB), vld1q_f32(spm + k)));
+        vst1q_f32(sc + k, a);
+        vmx = nmax_lanes(vmx, a);
+    }
+    float lanes[4], mx = -1e30f;
+    vst1q_f32(lanes, vmx);
+    for (int l = 0; l < 4; l++) mx = lanes[l] > mx ? lanes[l] : mx;
+    for (int k = n4; k < n; k++) {
+        const float a = (float)ia[k] * A * sk[k] + (float)ib[k] * B * spm[k];
+        sc[k] = a;
+        mx = a > mx ? a : mx;
+    }
+    const float mx64 = mx * NEXP_STEPS + 0.5f;
+    const float32x4_t vmx64 = vdupq_n_f32(mx64), v64 = vdupq_n_f32((float)NEXP_STEPS);
+    float sum = 0.f;
+    int32_t ixb[64];
+    for (int k0 = 0; k0 < n; k0 += 64) {   // indices in vectors, then the gather and the sum in key order
+        const int kn = n - k0 < 64 ? n - k0 : 64, kn4 = kn & ~3;
+        for (int k = 0; k < kn4; k += 4)
+            vst1q_s32(ixb + k, vcvtq_s32_f32(vsubq_f32(vmx64, vmulq_f32(vld1q_f32(sc + k0 + k), v64))));
+        for (int k = kn4; k < kn; k++) ixb[k] = (int)(mx64 - sc[k0 + k] * NEXP_STEPS);
+        for (int k = 0; k < kn; k++) {
+            const int ix = ixb[k];
+            const float ex = (unsigned)ix < NEXP_N ? nexp_tab[ix] : 0.f;
+            sum += ex;
+            sc[k0 + k] = ex;
+        }
+    }
+    uint32x4_t vpm = vdupq_n_u32(0);
+    for (int k = 0; k < n4; k += 4) {
+        const float32x4_t p2 = vmulq_f32(vld1q_f32(sc + k), vld1q_f32(sv + k));
+        vst1q_f32(sc + k, p2);
+        vpm = vmaxq_u32(vpm, vreinterpretq_u32_f32(p2));
+    }
+    uint32_t pl[4];
+    vst1q_u32(pl, vpm);
+    float pm = 0.f;
+    for (int l = 0; l < 4; l++) { float v; memcpy(&v, &pl[l], 4); pm = v > pm ? v : pm; }
+    for (int k = n4; k < n; k++) {
+        const float p2 = sc[k] * sv[k];
+        sc[k] = p2;
+        pm = p2 > pm ? p2 : pm;
+    }
+    *sum_out = sum;
+    *pm_out = pm;
+}
+// pq[k] = rne(sc[k] * inv) for k < n, as the C loop (vector + scalar tail)
+static void nquant_probs_neon(const float *sc, float inv, int n, int8_t *pq)
+{
+    const float32x4_t magic = vdupq_n_f32(12582912.0f), vinv = vdupq_n_f32(inv);
+    int k = 0;
+    for (; k + 8 <= n; k += 8) {
+        const float32x4_t y0 = vsubq_f32(vaddq_f32(vmulq_f32(vld1q_f32(sc + k), vinv), magic), magic);
+        const float32x4_t y1 = vsubq_f32(vaddq_f32(vmulq_f32(vld1q_f32(sc + k + 4), vinv), magic), magic);
+        vst1_s8(pq + k, vmovn_s16(vcombine_s16(vmovn_s32(vcvtq_s32_f32(y0)), vmovn_s32(vcvtq_s32_f32(y1)))));
+    }
+    for (; k < n; k++) { float y = sc[k] * inv + 12582912.0f; pq[k] = (int8_t)(int)(y - 12582912.0f); }
+}
+// y[e] = (float)acc[e] * os
+static void nscale_neon(const int32_t *acc, float os, int n, float *y)
+{
+    const float32x4_t vos = vdupq_n_f32(os);
+    int e = 0;
+    for (; e + 4 <= n; e += 4) vst1q_f32(y + e, vmulq_f32(vcvtq_f32_s32(vld1q_s32(acc + e)), vos));
+    for (; e < n; e++) y[e] = (float)acc[e] * os;
+}
+#endif
 static void nexp_init(void)
 {
     static int done;
@@ -451,6 +543,18 @@ static void natt_job(void *p, int b, int e, int w)
             }
             const float A = squ * scale, B = sqv * scale;
             const float *spm = sp + m0;
+#ifdef NNEON
+            if (NNEON) {
+                float sum, pm;
+                natt_probs_neon(ia, ib, A, B, sk, spm, sv, T, sc, pq, &sum, &pm);
+                if (pm < 1e-30f) pm = 1e-30f;
+                nquant_probs_neon(sc, 127.0f / pm, T, pq);
+                for (int j = T; j < c->Tp; j++) pq[j] = 0;
+                tasr_dot_rows_s8(pq, VT, c->Tp, dh, c->Tp, ia);
+                nscale_neon(ia, pm / 127.0f / sum, dh, c->att + (size_t)i * d + hh * dh);
+                continue;
+            }
+#endif
             float mx = -1e30f;
             for (int j = 0; j < T; j++) {
                 float a = (float)ia[j] * A * sk[j] + (float)ib[j] * B * spm[j];
@@ -1382,6 +1486,18 @@ static void satt_job(void *p, int b, int e, int w)
             }
             const float A = s->squ[hh * C + r] * scale, B = s->sqv[hh * C + r] * scale;
             const float *spm = spp + m0;
+#ifdef NNEON
+            if (NNEON) {
+                float sum, pm;
+                natt_probs_neon(ia, ib, A, B, sk, spm, sv, nkeys, sc, pq, &sum, &pm);
+                if (pm < 1e-30f) pm = 1e-30f;
+                nquant_probs_neon(sc, 127.0f / pm, nkeys, pq);
+                for (int k = nkeys; k < kp16; k++) pq[k] = 0;
+                tasr_dot_rows_s8(pq, VT, s->Lcp, dh, kp16, ia);
+                nscale_neon(ia, pm / 127.0f / sum, dh, s->att + (size_t)r * d + hh * dh);
+                continue;
+            }
+#endif
             float mx = -1e30f;
             for (int k = 0; k < nkeys; k++) {
                 const float a = (float)ia[k] * A * sk[k] + (float)ib[k] * B * spm[k];
