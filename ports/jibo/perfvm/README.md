@@ -59,3 +59,4 @@ Instructions for the 5.76 s clip (millions). Every round passed the gate before 
 |---|---|---|---|---|---|
 | r00 | baseline | 15,384.6 | 14,203.0 | 2,129.3 | 1,968.4 |
 | r01 | plain: ARMv6 SIMD32 int8 kernels (`sxtb16` + `smlad`, 4-row register blocking) | 6,495.9 (−57.8%) | 6,001.6 (−57.7%) | 2,129.3 | 1,968.4 |
+| r02 | neon: hand asm for the 1-shared × 4-row int8 dot block (post-increment `vld1.8`, 23 instr per 64 MACs) | 6,495.9 | 6,001.6 | 1,827.5 (−14.2%) | 1,685.3 (−14.4%) |

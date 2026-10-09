@@ -124,25 +124,69 @@ static inline int32_t tail_dot(const int8_t *a, const int8_t *b, int from, int t
     return s;
 }
 
+// Four dot products against one shared vector, 16 bytes per step, in hand-written asm: GCC compiled the intrinsics
+// version with base+offset addressing (five address adds per step: 32 instructions per 64 multiply-accumulates);
+// post-increment loads make it 23. Same arithmetic (vmull.s8 then vpadal.s16 into int32 lanes), so the same sums.
+// Clobbers only q0-q3 and q8-q15 (q4-q7 are callee-saved). n16 >= 1 blocks of 16 bytes. out4[i] = dot(s, p_i).
+static inline void dot1x4_neon(const int8_t *sv, const int8_t *p0, const int8_t *p1, const int8_t *p2, const int8_t *p3,
+                               int n16, int32_t *out4)
+{
+    __asm__ volatile(
+        "vmov.i32   q8, #0\n\t"
+        "vmov.i32   q9, #0\n\t"
+        "vmov.i32   q10, #0\n\t"
+        "vmov.i32   q11, #0\n\t"
+        "1:\n\t"
+        "vld1.8     {d0-d1}, [%[s]]!\n\t"
+        "vld1.8     {d2-d3}, [%[p0]]!\n\t"
+        "vld1.8     {d4-d5}, [%[p1]]!\n\t"
+        "vmull.s8   q12, d0, d2\n\t"
+        "vmull.s8   q13, d1, d3\n\t"
+        "vld1.8     {d6-d7}, [%[p2]]!\n\t"
+        "vpadal.s16 q8, q12\n\t"
+        "vpadal.s16 q8, q13\n\t"
+        "vmull.s8   q14, d0, d4\n\t"
+        "vmull.s8   q15, d1, d5\n\t"
+        "vld1.8     {d2-d3}, [%[p3]]!\n\t"
+        "vpadal.s16 q9, q14\n\t"
+        "vpadal.s16 q9, q15\n\t"
+        "vmull.s8   q12, d0, d6\n\t"
+        "vmull.s8   q13, d1, d7\n\t"
+        "vpadal.s16 q10, q12\n\t"
+        "vpadal.s16 q10, q13\n\t"
+        "vmull.s8   q14, d0, d2\n\t"
+        "vmull.s8   q15, d1, d3\n\t"
+        "vpadal.s16 q11, q14\n\t"
+        "vpadal.s16 q11, q15\n\t"
+        "subs       %[n], %[n], #1\n\t"
+        "bne        1b\n\t"
+        "vpadd.i32  d16, d16, d17\n\t"   // lane sums: [s0 s0'] ... then pairwise across accumulators
+        "vpadd.i32  d17, d18, d19\n\t"
+        "vpadd.i32  d18, d20, d21\n\t"
+        "vpadd.i32  d19, d22, d23\n\t"
+        "vpadd.i32  d16, d16, d17\n\t"   // [dot0 dot1]
+        "vpadd.i32  d17, d18, d19\n\t"   // [dot2 dot3]
+        "vst1.32    {d16-d17}, [%[o]]\n\t"
+        : [s] "+r"(sv), [p0] "+r"(p0), [p1] "+r"(p1), [p2] "+r"(p2), [p3] "+r"(p3), [n] "+r"(n16)
+        : [o] "r"(out4)
+        : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "d16", "d17", "d18", "d19", "d20", "d21", "d22", "d23",
+          "d24", "d25", "d26", "d27", "d28", "d29", "d30", "d31", "memory", "cc");
+}
+
 // out[t] = dot(w, x + t*ldq): four rows share each weight vector
 static void dot_rows_s8_neon(const int8_t *w, const int8_t *x, int ldq, int T, int kp, int32_t *out)
 {
     const int k16 = kp & ~15;
     int t = 0;
-    for (; t + 4 <= T; t += 4) {
+    for (; k16 && t + 4 <= T; t += 4) {
         const int8_t *a0 = x + (size_t)t * ldq, *a1 = a0 + ldq, *a2 = a1 + ldq, *a3 = a2 + ldq;
-        int32x4_t s0 = vdupq_n_s32(0), s1 = s0, s2 = s0, s3 = s0;
-        for (int i = 0; i < k16; i += 16) {
-            const int8x16_t wv = vld1q_s8(w + i);
-            s0 = mac16(s0, vld1q_s8(a0 + i), wv);
-            s1 = mac16(s1, vld1q_s8(a1 + i), wv);
-            s2 = mac16(s2, vld1q_s8(a2 + i), wv);
-            s3 = mac16(s3, vld1q_s8(a3 + i), wv);
+        dot1x4_neon(w, a0, a1, a2, a3, k16 >> 4, out + t);
+        if (k16 < kp) {
+            out[t] += tail_dot(a0, w, k16, kp);
+            out[t + 1] += tail_dot(a1, w, k16, kp);
+            out[t + 2] += tail_dot(a2, w, k16, kp);
+            out[t + 3] += tail_dot(a3, w, k16, kp);
         }
-        out[t] = hsum(s0) + tail_dot(a0, w, k16, kp);
-        out[t + 1] = hsum(s1) + tail_dot(a1, w, k16, kp);
-        out[t + 2] = hsum(s2) + tail_dot(a2, w, k16, kp);
-        out[t + 3] = hsum(s3) + tail_dot(a3, w, k16, kp);
     }
     for (; t < T; t++) {
         const int8_t *a = x + (size_t)t * ldq;
@@ -160,20 +204,15 @@ static void gemm_s8_xr_neon(const int8_t *W, int kp, int nb, const int8_t *x, in
         const int8_t *a = x + (size_t)t * ldq;
         int32_t *o = acc + (size_t)t * nb;
         int j = 0;
-        for (; j + 4 <= nb; j += 4) {
+        for (; k16 && j + 4 <= nb; j += 4) {
             const int8_t *w0 = W + (size_t)j * kp, *w1 = w0 + kp, *w2 = w1 + kp, *w3 = w2 + kp;
-            int32x4_t s0 = vdupq_n_s32(0), s1 = s0, s2 = s0, s3 = s0;
-            for (int i = 0; i < k16; i += 16) {
-                const int8x16_t av = vld1q_s8(a + i);
-                s0 = mac16(s0, av, vld1q_s8(w0 + i));
-                s1 = mac16(s1, av, vld1q_s8(w1 + i));
-                s2 = mac16(s2, av, vld1q_s8(w2 + i));
-                s3 = mac16(s3, av, vld1q_s8(w3 + i));
+            dot1x4_neon(a, w0, w1, w2, w3, k16 >> 4, o + j);
+            if (k16 < kp) {
+                o[j] += tail_dot(a, w0, k16, kp);
+                o[j + 1] += tail_dot(a, w1, k16, kp);
+                o[j + 2] += tail_dot(a, w2, k16, kp);
+                o[j + 3] += tail_dot(a, w3, k16, kp);
             }
-            o[j] = hsum(s0) + tail_dot(a, w0, k16, kp);
-            o[j + 1] = hsum(s1) + tail_dot(a, w1, k16, kp);
-            o[j + 2] = hsum(s2) + tail_dot(a, w2, k16, kp);
-            o[j + 3] = hsum(s3) + tail_dot(a, w3, k16, kp);
         }
         for (; j < nb; j++) {
             const int8_t *w = W + (size_t)j * kp;
