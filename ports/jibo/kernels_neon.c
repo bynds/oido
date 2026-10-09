@@ -337,25 +337,61 @@ static inline int32_t tail_dot32(const int8_t *a, const int8_t *b, int from, int
 // acc + dot4(word a, word b)
 #define MAC4(acc, a, b) acc = smlad(sx13(a), sx13(b), smlad(sx02(a), sx02(b), acc))
 
+// Four dot products against one shared vector, 4 bytes per step, in hand asm: from C, GCC spilled accumulators and
+// pointers to the stack in this loop (about 32 instructions per 16 multiply-accumulates). Here all 14 values live in
+// core registers: 25 instructions per 16. Same smlad arithmetic, so the same sums. n4 >= 1 steps. out4[i] = dot(s, p_i).
+static inline void dot1x4_simd32(const int8_t *sv, const int8_t *p0, const int8_t *p1, const int8_t *p2,
+                                 const int8_t *p3, int n4, int32_t *out4)
+{
+    int32_t a0 = 0, a1 = 0, a2 = 0, a3 = 0;
+    uint32_t s02, s13, v, t;
+    __asm__ volatile(
+        "1:\n\t"
+        "ldr      %[v], [%[s]], #4\n\t"
+        "sxtb16   %[s02], %[v]\n\t"
+        "sxtb16   %[s13], %[v], ror #8\n\t"
+        "ldr      %[v], [%[p0]], #4\n\t"
+        "sxtb16   %[t], %[v], ror #8\n\t"
+        "sxtb16   %[v], %[v]\n\t"
+        "smlad    %[a0], %[v], %[s02], %[a0]\n\t"
+        "smlad    %[a0], %[t], %[s13], %[a0]\n\t"
+        "ldr      %[v], [%[p1]], #4\n\t"
+        "sxtb16   %[t], %[v], ror #8\n\t"
+        "sxtb16   %[v], %[v]\n\t"
+        "smlad    %[a1], %[v], %[s02], %[a1]\n\t"
+        "smlad    %[a1], %[t], %[s13], %[a1]\n\t"
+        "ldr      %[v], [%[p2]], #4\n\t"
+        "sxtb16   %[t], %[v], ror #8\n\t"
+        "sxtb16   %[v], %[v]\n\t"
+        "smlad    %[a2], %[v], %[s02], %[a2]\n\t"
+        "smlad    %[a2], %[t], %[s13], %[a2]\n\t"
+        "ldr      %[v], [%[p3]], #4\n\t"
+        "sxtb16   %[t], %[v], ror #8\n\t"
+        "sxtb16   %[v], %[v]\n\t"
+        "smlad    %[a3], %[v], %[s02], %[a3]\n\t"
+        "smlad    %[a3], %[t], %[s13], %[a3]\n\t"
+        "subs     %[n], %[n], #1\n\t"
+        "bne      1b\n\t"
+        : [s] "+r"(sv), [p0] "+r"(p0), [p1] "+r"(p1), [p2] "+r"(p2), [p3] "+r"(p3), [n] "+r"(n4), [a0] "+r"(a0),
+          [a1] "+r"(a1), [a2] "+r"(a2), [a3] "+r"(a3), [s02] "=&r"(s02), [s13] "=&r"(s13), [v] "=&r"(v), [t] "=&r"(t)
+        :
+        : "memory", "cc");
+    out4[0] = a0; out4[1] = a1; out4[2] = a2; out4[3] = a3;
+}
+
 static void dot_rows_s8_simd32(const int8_t *w, const int8_t *x, int ldq, int T, int kp, int32_t *out)
 {
     const int k4 = kp & ~3;
     int t = 0;
-    for (; t + 4 <= T; t += 4) {   // four rows share each widened weight word
+    for (; k4 && t + 4 <= T; t += 4) {   // four rows share each widened weight word
         const int8_t *a0 = x + (size_t)t * ldq, *a1 = a0 + ldq, *a2 = a1 + ldq, *a3 = a2 + ldq;
-        int32_t s0 = 0, s1 = 0, s2 = 0, s3 = 0;
-        for (int i = 0; i < k4; i += 4) {
-            const uint32_t wv = ld32(w + i), w02 = sx02(wv), w13 = sx13(wv);
-            uint32_t v;
-            v = ld32(a0 + i); s0 = smlad(sx13(v), w13, smlad(sx02(v), w02, s0));
-            v = ld32(a1 + i); s1 = smlad(sx13(v), w13, smlad(sx02(v), w02, s1));
-            v = ld32(a2 + i); s2 = smlad(sx13(v), w13, smlad(sx02(v), w02, s2));
-            v = ld32(a3 + i); s3 = smlad(sx13(v), w13, smlad(sx02(v), w02, s3));
+        dot1x4_simd32(w, a0, a1, a2, a3, k4 >> 2, out + t);
+        if (k4 < kp) {
+            out[t] += tail_dot32(a0, w, k4, kp);
+            out[t + 1] += tail_dot32(a1, w, k4, kp);
+            out[t + 2] += tail_dot32(a2, w, k4, kp);
+            out[t + 3] += tail_dot32(a3, w, k4, kp);
         }
-        out[t] = s0 + tail_dot32(a0, w, k4, kp);
-        out[t + 1] = s1 + tail_dot32(a1, w, k4, kp);
-        out[t + 2] = s2 + tail_dot32(a2, w, k4, kp);
-        out[t + 3] = s3 + tail_dot32(a3, w, k4, kp);
     }
     for (; t < T; t++) {
         const int8_t *a = x + (size_t)t * ldq;
@@ -372,21 +408,15 @@ static void gemm_s8_xr_simd32(const int8_t *W, int kp, int nb, const int8_t *x, 
         const int8_t *a = x + (size_t)t * ldq;
         int32_t *o = acc + (size_t)t * nb;
         int j = 0;
-        for (; j + 4 <= nb; j += 4) {   // four weight rows share each widened activation word
+        for (; k4 && j + 4 <= nb; j += 4) {   // four weight rows share each widened activation word
             const int8_t *w0 = W + (size_t)j * kp, *w1 = w0 + kp, *w2 = w1 + kp, *w3 = w2 + kp;
-            int32_t s0 = 0, s1 = 0, s2 = 0, s3 = 0;
-            for (int i = 0; i < k4; i += 4) {
-                const uint32_t av = ld32(a + i), a02 = sx02(av), a13 = sx13(av);
-                uint32_t v;
-                v = ld32(w0 + i); s0 = smlad(sx13(v), a13, smlad(sx02(v), a02, s0));
-                v = ld32(w1 + i); s1 = smlad(sx13(v), a13, smlad(sx02(v), a02, s1));
-                v = ld32(w2 + i); s2 = smlad(sx13(v), a13, smlad(sx02(v), a02, s2));
-                v = ld32(w3 + i); s3 = smlad(sx13(v), a13, smlad(sx02(v), a02, s3));
+            dot1x4_simd32(a, w0, w1, w2, w3, k4 >> 2, o + j);
+            if (k4 < kp) {
+                o[j] += tail_dot32(a, w0, k4, kp);
+                o[j + 1] += tail_dot32(a, w1, k4, kp);
+                o[j + 2] += tail_dot32(a, w2, k4, kp);
+                o[j + 3] += tail_dot32(a, w3, k4, kp);
             }
-            o[j] = s0 + tail_dot32(a, w0, k4, kp);
-            o[j + 1] = s1 + tail_dot32(a, w1, k4, kp);
-            o[j + 2] = s2 + tail_dot32(a, w2, k4, kp);
-            o[j + 3] = s3 + tail_dot32(a, w3, k4, kp);
         }
         for (; j < nb; j++) {
             const int8_t *w = W + (size_t)j * kp;
