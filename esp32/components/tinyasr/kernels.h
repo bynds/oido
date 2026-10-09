@@ -1,6 +1,6 @@
 #pragma once
 // Modified 2026-10-08/09 for the Jibo port (ports/jibo): optional TASR_KERNEL_DISPATCH renaming of the portable kernels
-// (int8 dot products and tasr_quant_rows).
+// (int8 dot products and tasr_quant_rows); tasr_dot_rows2_s8 (two weight rows per call) used by tasr_qlin_range.
 #include <stdint.h>
 
 typedef struct {
@@ -12,6 +12,9 @@ typedef struct {
 
 // out[t] = dot(x + t*ldq, w) for t < T (kp multiple of 16, 16-byte aligned rows)
 void tasr_dot_rows_s8(const int8_t *w, const int8_t *x, int ldq, int T, int kp, int32_t *out);
+// two weight rows at once: out0[t] = dot(w0, x + t*ldq), out1[t] = dot(w1, x + t*ldq)
+void tasr_dot_rows2_s8(const int8_t *w0, const int8_t *w1, const int8_t *x, int ldq, int T, int kp, int32_t *out0,
+                       int32_t *out1);
 // int8 dot product; kp multiple of 16, both pointers 16-byte aligned.
 int32_t tasr_dot_s8(const int8_t *a, const int8_t *b, int kp);
 // unpack one int4 row (kp multiple of 32) to int8
@@ -36,6 +39,8 @@ void tasr_dot_rows_s8_scalar(const int8_t *w, const int8_t *x, int ldq, int T, i
 void tasr_gemm_blk16_scalar(const int8_t *tile, int kp, const int8_t *x, int ldq, int T, int32_t *out);
 void tasr_gemm_s8_xr_scalar(const int8_t *W, int kp, int nb, const int8_t *x, int ldq, int T, int32_t *acc);
 void tasr_dot48_rows_scalar(const int8_t *q, const int8_t *x, int ldx, int T, int32_t *out);
+void tasr_dot_rows2_s8_scalar(const int8_t *w0, const int8_t *w1, const int8_t *x, int ldq, int T, int kp,
+                              int32_t *out0, int32_t *out1);
 void tasr_quant_rows_scalar(const float *x, int T, int K, int ldx, int8_t *xq, int ldq, int kp, float *xs);
 extern int tasr_kernel_force_scalar;   // nonzero: the public kernels use the *_scalar versions
 const char *tasr_kernel_backend(void);  // "neon" or "scalar" (what the public kernels currently use)

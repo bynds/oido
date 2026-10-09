@@ -1,6 +1,6 @@
 #include "kernels.h"
 // Modified 2026-10-08/09 for the Jibo port (ports/jibo): optional TASR_KERNEL_DISPATCH renaming of the portable kernels
-// (int8 dot products and tasr_quant_rows).
+// (int8 dot products and tasr_quant_rows); tasr_dot_rows2_s8 (two weight rows per call) used by tasr_qlin_range.
 #include <math.h>
 #include <string.h>
 
@@ -77,6 +77,14 @@ void KSCALAR(tasr_dot_rows_s8)(const int8_t *w, const int8_t *x, int ldq, int T,
     }
 }
 #endif
+
+// Portable form: two calls. A SIMD build can share each activation load between the two weight rows.
+void KSCALAR(tasr_dot_rows2_s8)(const int8_t *w0, const int8_t *w1, const int8_t *x, int ldq, int T, int kp,
+                                int32_t *out0, int32_t *out1)
+{
+    tasr_dot_rows_s8(w0, x, ldq, T, kp, out0);
+    tasr_dot_rows_s8(w1, x, ldq, T, kp, out1);
+}
 
 int32_t tasr_dot_s8(const int8_t *a, const int8_t *b, int kp)
 {
@@ -203,7 +211,15 @@ void tasr_qlin_range(const tasr_qlin_t *L, const int8_t *xq, const float *xs, in
                 memset(acc, 0, sizeof(int32_t) * tn * nb);
                 for (int k0 = 0; k0 < kp; k0 += kc) {
                     const int kn = kp - k0 < kc ? kp - k0 : kc;
-                    for (int j = 0; j < nb; j++) {
+                    int j = 0;
+                    if (L->bits == 8)
+                        for (; j + 1 < nb; j += 2) {   // two weight rows per pass (same per-output sums)
+                            int32_t part2[64];
+                            const int8_t *w0 = L->w + (size_t)(nb0 + j) * kp + k0;
+                            tasr_dot_rows2_s8(w0, w0 + kp, xq + (size_t)t0 * ldq + k0, ldq, tn, kn, part, part2);
+                            for (int t = 0; t < tn; t++) { acc[t * nb + j] += part[t]; acc[t * nb + j + 1] += part2[t]; }
+                        }
+                    for (; j < nb; j++) {
                         const int8_t *w;
                         if (L->bits == 4) {
                             tasr_unpack_s4((const uint8_t *)L->w + ((size_t)(nb0 + j) * kp + k0) / 2, wtmp, kn);
@@ -230,7 +246,21 @@ void tasr_qlin_range(const tasr_qlin_t *L, const int8_t *xq, const float *xs, in
     const int tb = 64;
     for (int t0 = 0; t0 < T; t0 += tb) {
         const int tn = T - t0 < tb ? T - t0 : tb;
-        for (int n = n0; n < n1; n++) {
+        int n = n0;
+        if (L->bits == 8)
+            for (; n + 1 < n1; n += 2) {   // two weight rows per pass (same per-output sums and float epilogue)
+                int32_t acc2[64];
+                const int8_t *w0 = L->w + (size_t)n * kp;
+                tasr_dot_rows2_s8(w0, w0 + kp, xq + (size_t)t0 * ldq, ldq, tn, kp, acc, acc2);
+                for (int r = 0; r < 2; r++) {
+                    const int32_t *a = r ? acc2 : acc;
+                    const float sw = L->s[n + r], b = L->b[n + r];
+                    float *yo = y + (size_t)t0 * ldy + n + r;
+                    const float *xst = xs + t0;
+                    for (int t = 0; t < tn; t++) yo[(size_t)t * ldy] = (float)a[t] * xst[t] * sw + b;
+                }
+            }
+        for (; n < n1; n++) {
             const int8_t *w;
             if (L->bits == 4) {
                 tasr_unpack_s4((const uint8_t *)L->w + (size_t)n * (kp >> 1), wtmp, kp);

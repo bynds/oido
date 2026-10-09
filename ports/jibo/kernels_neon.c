@@ -273,6 +273,31 @@ static inline void dot2x4_neon(const int8_t *x0, const int8_t *x1, const int8_t 
           "d24", "d25", "d26", "d27", "d28", "d29", "d30", "d31", "memory", "cc");
 }
 
+// out0[t] = dot(w0, x_t), out1[t] = dot(w1, x_t): the row-layout GEMMs (K = 704, front-end chunks) with two weight
+// rows per pass. dot2x4_neon with the weight rows as its shared pair: each activation load feeds two outputs.
+static void dot_rows2_s8_neon(const int8_t *w0, const int8_t *w1, const int8_t *x, int ldq, int T, int kp,
+                              int32_t *out0, int32_t *out1)
+{
+    const int k16 = kp & ~15;
+    int t = 0;
+    if (k16 == kp && k16)
+        for (; t + 4 <= T; t += 4) {
+            const int8_t *a0 = x + (size_t)t * ldq;
+            dot2x4_neon(w0, w1, a0, a0 + ldq, a0 + 2 * (size_t)ldq, a0 + 3 * (size_t)ldq, k16 >> 4, out0 + t, out1 + t);
+        }
+    for (; t < T; t++) {
+        const int8_t *a = x + (size_t)t * ldq;
+        int32x4_t s0 = vdupq_n_s32(0), s1 = s0;
+        for (int i = 0; i < k16; i += 16) {
+            const int8x16_t av = vld1q_s8(a + i);
+            s0 = mac16(s0, av, vld1q_s8(w0 + i));
+            s1 = mac16(s1, av, vld1q_s8(w1 + i));
+        }
+        out0[t] = hsum(s0) + tail_dot(a, w0, k16, kp);
+        out1[t] = hsum(s1) + tail_dot(a, w1, k16, kp);
+    }
+}
+
 // acc[t*nb + j] = dot(x + t*ldq, W + j*kp): each activation vector is shared by four weight rows
 static void gemm_s8_xr_neon(const int8_t *W, int kp, int nb, const int8_t *x, int ldq, int T, int32_t *acc)
 {
@@ -571,6 +596,19 @@ void tasr_gemm_s8_xr(const int8_t *W, int kp, int nb, const int8_t *x, int ldq, 
     if (USE_SIMD32) { gemm_s8_xr_simd32(W, kp, nb, x, ldq, T, acc); return; }
 #endif
     tasr_gemm_s8_xr_scalar(W, kp, nb, x, ldq, T, acc);
+}
+
+void tasr_dot_rows2_s8(const int8_t *w0, const int8_t *w1, const int8_t *x, int ldq, int T, int kp, int32_t *out0,
+                       int32_t *out1)
+{
+#ifdef TASR_NEON
+    if (USE_NEON) {
+        KSTAT(0, kp, T, 2, ldq, (unsigned long long)T * kp * 2);
+        dot_rows2_s8_neon(w0, w1, x, ldq, T, kp, out0, out1);
+        return;
+    }
+#endif
+    tasr_dot_rows2_s8_scalar(w0, w1, x, ldq, T, kp, out0, out1);
 }
 
 void tasr_dot48_rows(const int8_t *q, const int8_t *x, int ldx, int T, int32_t *out)

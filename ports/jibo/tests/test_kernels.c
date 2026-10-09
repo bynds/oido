@@ -70,6 +70,14 @@ static void test_shape(int kp, int T, int nb, int ldpad, int offset, int mode)
         tasr_dot48_rows_scalar(w, x, ldq, T, o2);
         cmp("dot48_rows", o1, o2, T, 48, T, 1, ldq, mode);
     }
+    {   // two weight rows at once vs the C kernel row by row
+        static int32_t r0[MAXT], r1[MAXT], e0[MAXT], e1[MAXT];
+        tasr_dot_rows2_s8(w, w + kp, x, ldq, T, kp, r0, r1);
+        tasr_dot_rows_s8_scalar(w, x, ldq, T, kp, e0);
+        tasr_dot_rows_s8_scalar(w + kp, x, ldq, T, kp, e1);
+        cmp("dot_rows2_s8 (0)", r0, e0, T, kp, T, 2, ldq, mode);
+        cmp("dot_rows2_s8 (1)", r1, e1, T, kp, T, 2, ldq, mode);
+    }
     int32_t d1 = 0;
     if (kp % 16 == 0 && offset == 0) {
         d1 = tasr_dot_s8(x, w, kp);
